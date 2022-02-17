@@ -1,7 +1,7 @@
 ﻿using System;
 
 
-namespace GameWrriors.DependencyInjection.Attributes
+namespace GameWarriors.DependencyInjection.Attributes
 {
     [AttributeUsage(AttributeTargets.Property)]
     public class InjectAttribute : Attribute

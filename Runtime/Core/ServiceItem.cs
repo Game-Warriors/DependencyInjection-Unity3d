@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Reflection;
 
-namespace GameWrriors.DependencyInjection.Data
+namespace GameWarriors.DependencyInjection.Data
 {
     //internal enum EServiceLifeType { None, Singleton, Scope, Transient }
 

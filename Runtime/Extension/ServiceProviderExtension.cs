@@ -1,6 +1,6 @@
 using System;
 
-namespace GameWrriors.DependencyInjection.Extensions
+namespace GameWarriors.DependencyInjection.Extensions
 {
 
     public static class ServiceProviderExtension

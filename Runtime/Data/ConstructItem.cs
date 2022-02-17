@@ -1,4 +1,4 @@
-﻿namespace GameWrriors.DependencyInjection.Data
+﻿namespace GameWarriors.DependencyInjection.Data
 {
     internal class ConstructItem
     {

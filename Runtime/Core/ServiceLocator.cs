@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace GameWrriors.DependencyInjection
+namespace GameWarriors.DependencyInjection
 {
     public static class ServiceLocator
     {

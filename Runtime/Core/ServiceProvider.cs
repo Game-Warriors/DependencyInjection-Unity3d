@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace GameWrriors.DependencyInjection.Core
+namespace GameWarriors.DependencyInjection.Core
 {
     public class ServiceProvider : IServiceProvider
     {

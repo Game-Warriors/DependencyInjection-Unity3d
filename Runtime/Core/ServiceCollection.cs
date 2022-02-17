@@ -1,12 +1,12 @@
-﻿using GameWrriors.DependencyInjection.Attributes;
-using GameWrriors.DependencyInjection.Data;
+﻿using GameWarriors.DependencyInjection.Attributes;
+using GameWarriors.DependencyInjection.Data;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Threading.Tasks;
 using UnityEngine;
 
-namespace GameWrriors.DependencyInjection.Core
+namespace GameWarriors.DependencyInjection.Core
 {
     public class ServiceCollection
     {
