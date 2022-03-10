@@ -14,7 +14,6 @@ namespace GameWarriors.DependencyInjection.Core
         private Dictionary<Type, ServiceItem> _transientTable;
         private Dictionary<Type, Type> _abstractionToMainTable;
         private ServiceProvider _serviceProvider;
-        private Task[] _loadingTasks;
         private int _loadingCount;
 
 
@@ -70,12 +69,24 @@ namespace GameWarriors.DependencyInjection.Core
         {
             _loadingCount = 0;
             await Task.WhenAll(Task.Run(() => Parallel.ForEach(_mainTypeTable, FindConstructorParams)), Task.Run(() => Parallel.ForEach(_transientTable, FindConstructorParams)));
-            _loadingTasks = new Task[_loadingCount];
             InitializeSingleton();
-            Task transientTask = Task.Run(InitializeTransient);
-            Task propertyTask = Task.Run(() => Parallel.ForEach(_mainTypeTable.Values, SetSingletonProperties));
-            await Task.WhenAll(_loadingTasks);
-            await propertyTask;
+            //Task transientTask = Task.Run(InitializeTransient);
+            await Task.Run(() => Parallel.ForEach(_mainTypeTable.Values, SetSingletonProperties));
+            await WaitLoadingAll();
+        }
+
+        private Task WaitLoadingAll()
+        {
+            Task [] loadingTasks = new Task[_loadingCount];
+            foreach (ServiceItem item in _mainTypeTable.Values)
+            {
+                if (item.LoadingMethod != null)
+                {
+                    --_loadingCount;
+                    loadingTasks[_loadingCount] = InvokeLoading(item.LoadingMethod, item);
+                }
+            }
+            return Task.WhenAll(loadingTasks);
         }
 
         private void InitializeSingleton()
@@ -163,11 +174,6 @@ namespace GameWarriors.DependencyInjection.Core
             }
             item.Instance = serviceObject;
             _serviceProvider.SetService(injectType, serviceObject);
-            if (item.LoadingMethod != null)
-            {
-                --_loadingCount;
-                _loadingTasks[_loadingCount] = InvokeLoading(item.LoadingMethod, serviceObject);
-            }
             return serviceObject;
         }
 
