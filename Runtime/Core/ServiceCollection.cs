@@ -83,7 +83,7 @@ namespace GameWarriors.DependencyInjection.Core
                 if (item.LoadingMethod != null)
                 {
                     --_loadingCount;
-                    loadingTasks[_loadingCount] = InvokeLoading(item.LoadingMethod, item);
+                    loadingTasks[_loadingCount] = InvokeLoading(item.LoadingMethod, item.Instance);
                 }
             }
             return Task.WhenAll(loadingTasks);
