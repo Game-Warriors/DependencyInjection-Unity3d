@@ -67,8 +67,8 @@ namespace GameWarriors.DependencyInjection.Core
 
         public async Task Build(Action onDone = null)
         {
-            System.Diagnostics.Stopwatch stopwatch = new System.Diagnostics.Stopwatch();
-            stopwatch.Start();
+            //System.Diagnostics.Stopwatch stopwatch = new System.Diagnostics.Stopwatch();
+            //stopwatch.Start();
             _loadingCount = 0;
             await Task.WhenAll(Task.Run(() => Parallel.ForEach(_mainTypeTable, FindConstructorParams)), Task.Run(() => Parallel.ForEach(_transientTable, FindConstructorParams)));
             InitializeSingleton();
@@ -78,8 +78,8 @@ namespace GameWarriors.DependencyInjection.Core
             //stopwatch.Start();
             await WaitLoadingAll();
             WaitInitAll();
-            stopwatch.Stop();
-            UnityEngine.Debug.Log(stopwatch.ElapsedTicks);
+            //stopwatch.Stop();
+            //UnityEngine.Debug.Log(stopwatch.ElapsedTicks);
             onDone?.Invoke();
         }
 
