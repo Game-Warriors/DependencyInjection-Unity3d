@@ -10,6 +10,7 @@ namespace GameWarriors.DependencyInjection.Core
 {
     public class ServiceCollection
     {
+        private readonly string INIT_METHOD_NAME;
         private Dictionary<Type, ServiceItem> _mainTypeTable;
         private Dictionary<Type, ServiceItem> _transientTable;
         private Dictionary<Type, Type> _abstractionToMainTable;
@@ -17,10 +18,9 @@ namespace GameWarriors.DependencyInjection.Core
         private int _loadingCount;
 
 
-        //private int _singletonCounter;
-
-        public ServiceCollection()
+        public ServiceCollection(string initMethodName)
         {
+            INIT_METHOD_NAME = initMethodName;
             _mainTypeTable = new Dictionary<Type, ServiceItem>();
             _transientTable = new Dictionary<Type, ServiceItem>();
             _abstractionToMainTable = new Dictionary<Type, Type>();
@@ -65,19 +65,41 @@ namespace GameWarriors.DependencyInjection.Core
             //TODO need Implementation
         }
 
-        public async Task Build()
+        public async Task Build(Action onDone = null)
         {
+            System.Diagnostics.Stopwatch stopwatch = new System.Diagnostics.Stopwatch();
+            stopwatch.Start();
             _loadingCount = 0;
             await Task.WhenAll(Task.Run(() => Parallel.ForEach(_mainTypeTable, FindConstructorParams)), Task.Run(() => Parallel.ForEach(_transientTable, FindConstructorParams)));
             InitializeSingleton();
             //Task transientTask = Task.Run(InitializeTransient);
             await Task.Run(() => Parallel.ForEach(_mainTypeTable.Values, SetSingletonProperties));
+
+            //stopwatch.Start();
             await WaitLoadingAll();
+            WaitInitAll();
+            stopwatch.Stop();
+            UnityEngine.Debug.Log(stopwatch.ElapsedTicks);
+            onDone?.Invoke();
         }
+
+        //private Task WaitLoadingAll()
+        //{
+        //    Task[] loadingTasks = new Task[_loadingCount];
+        //    foreach (ServiceItem item in _mainTypeTable.Values)
+        //    {
+        //        if (item.LoadingMethod != null)
+        //        {
+        //            --_loadingCount;
+        //            loadingTasks[_loadingCount] = InvokeLoading(item.LoadingMethod, item.Instance);
+        //        }
+        //    }
+        //    return Task.WhenAll(loadingTasks);
+        //}
 
         private Task WaitLoadingAll()
         {
-            Task [] loadingTasks = new Task[_loadingCount];
+            Task[] loadingTasks = new Task[_loadingCount];
             foreach (ServiceItem item in _mainTypeTable.Values)
             {
                 if (item.LoadingMethod != null)
@@ -87,6 +109,20 @@ namespace GameWarriors.DependencyInjection.Core
                 }
             }
             return Task.WhenAll(loadingTasks);
+        }
+
+        private void WaitInitAll()
+        {
+            if (string.IsNullOrEmpty(INIT_METHOD_NAME))
+                return;
+
+            foreach (ServiceItem item in _mainTypeTable.Values)
+            {
+                if (item.InitMethod != null)
+                {
+                    InvokeInit(item.InitMethod, item.InitParamsArray, item.Instance);
+                }
+            }
         }
 
         private void InitializeSingleton()
@@ -127,11 +163,20 @@ namespace GameWarriors.DependencyInjection.Core
                 ConstructorInfo[] constructors = mainType.GetConstructors();
                 ConstructorInfo firstConstructors = constructors[0];
                 ParameterInfo[] constructorParams = firstConstructors.GetParameters();
-                item.ParamsArray = constructorParams;
+                item.CtorParamsArray = constructorParams;
+            }
+            item.Properties = mainType.GetProperties(BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.SetProperty);
+            item.LoadingMethod = mainType.GetMethod("WaitForLoading", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Public);
+
+            if (!string.IsNullOrEmpty(INIT_METHOD_NAME))
+            {
+                item.InitMethod = mainType.GetMethod(INIT_METHOD_NAME, BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Public);
+                if (item.InitMethod != null)
+                {
+                    item.InitParamsArray = item.InitMethod.GetParameters();
+                }
             }
 
-            item.Properties = mainType.GetProperties(BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.SetProperty);
-            item.LoadingMethod = mainType.GetMethod("WaitForLoading");
             if (item.LoadingMethod != null)
             {
                 lock (_mainTypeTable)
@@ -143,7 +188,7 @@ namespace GameWarriors.DependencyInjection.Core
 
         private object CreateServiceItem(Type mainType, Type injectType, ServiceItem item)
         {
-            ParameterInfo[] constructorParams = item.ParamsArray;
+            ParameterInfo[] constructorParams = item.CtorParamsArray;
             object serviceObject;
             if (constructorParams == null && mainType.IsSubclassOf(typeof(MonoBehaviour)))
             {
@@ -192,12 +237,32 @@ namespace GameWarriors.DependencyInjection.Core
             }
         }
 
-        private Task InvokeLoading(MethodInfo methodInfo, object obj)
+        private Task InvokeLoading(MethodInfo methodInfo, object instance)
         {
-            var tmp = methodInfo.Invoke(obj, null) as Task;
+            var tmp = methodInfo.Invoke(instance, null) as Task;
             if (tmp == null)
-                Debug.LogError(obj);
+                UnityEngine.Debug.LogError(instance);
             return tmp;
+        }
+
+        private void InvokeInit(MethodInfo methodInfo, ParameterInfo[] infos, object instance)
+        {
+            int length = infos?.Length ?? 0;
+            if (length > 0)
+            {
+                object[] tmp = new object[length];
+                for (int i = 0; i < length; ++i)
+                {
+                    Type argType = infos[i].ParameterType;
+                    if (_abstractionToMainTable.TryGetValue(argType, out var mainType) && _mainTypeTable.TryGetValue(mainType, out ServiceItem item))
+                    {
+                        tmp[i] = item.Instance;
+                    }
+                }
+                methodInfo.Invoke(instance, tmp);
+            }
+            else
+                methodInfo.Invoke(instance, null);
         }
 
         private object ResolveSingletonService(Type serviceType)
