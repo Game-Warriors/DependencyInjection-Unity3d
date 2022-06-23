@@ -18,7 +18,7 @@ namespace GameWarriors.DependencyInjection.Core
         private int _loadingCount;
 
 
-        public ServiceCollection(string initMethodName)
+        public ServiceCollection(string initMethodName = default)
         {
             INIT_METHOD_NAME = initMethodName;
             _mainTypeTable = new Dictionary<Type, ServiceItem>();
