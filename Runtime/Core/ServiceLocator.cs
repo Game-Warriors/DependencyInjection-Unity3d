@@ -5,7 +5,7 @@ namespace GameWarriors.DependencyInjection
 {
     public class ServiceLocator
     {
-        private static Dictionary<Type, object> _serviceTable;
+        private Dictionary<Type, object> _serviceTable;
 
         public ServiceLocator(int size)
         {
