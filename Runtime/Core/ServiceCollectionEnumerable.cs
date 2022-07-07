@@ -1,14 +1,14 @@
-﻿using GameWarriors.DependencyInjection.Attributes;
+using GameWarriors.DependencyInjection.Core;
 using GameWarriors.DependencyInjection.Data;
 using System;
+using System.Collections;
 using System.Collections.Generic;
-using System.Reflection;
-using System.Threading.Tasks;
 using UnityEngine;
 
-namespace GameWarriors.DependencyInjection.Core
+namespace GameWarriors.DependencyInjection
 {
-    public class ServiceCollection
+    /*
+    public class ServiceCollectionEnumerable
     {
         private readonly string INIT_METHOD_NAME;
         private Dictionary<Type, ServiceItem> _mainTypeTable;
@@ -17,17 +17,6 @@ namespace GameWarriors.DependencyInjection.Core
         private ServiceProvider _serviceProvider;
         private int _loadingCount;
 
-
-        public ServiceCollection(ServiceProvider serviceProvider, string initMethodName = default)
-        {
-            INIT_METHOD_NAME = initMethodName;
-            _mainTypeTable = new Dictionary<Type, ServiceItem>();
-            _transientTable = new Dictionary<Type, ServiceItem>();
-            _abstractionToMainTable = new Dictionary<Type, Type>();
-            if (serviceProvider == null)
-                throw new NullReferenceException("Ther service provider is null");
-            AddSingleton<IServiceProvider, ServiceProvider>(_serviceProvider);
-        }
 
         public ServiceCollection(string initMethodName = default)
         {
@@ -304,4 +293,5 @@ namespace GameWarriors.DependencyInjection.Core
             return serviceItem.Instance != null;
         }
     }
+    */
 }
