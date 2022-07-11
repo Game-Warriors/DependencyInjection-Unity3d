@@ -1,3 +1,6 @@
+  version : 0.5.0
+  Add Coroutine base service collection named ServiceCollectionEnumerator which use no references to task class or threading namespace in compare to ServiceCollection class.
+
   version : 0.4.0
   Change the service locator inside service provider class from static to instance object class
 
