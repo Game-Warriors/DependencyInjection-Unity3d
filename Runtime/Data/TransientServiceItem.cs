@@ -1,51 +1,58 @@
-﻿using GameWarriors.DependencyInjection.Attributes;
+using GameWarriors.DependencyInjection.Attributes;
 using GameWarriors.DependencyInjection.Core;
 using System;
+using System.Collections;
+using System.Collections.Generic;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using UnityEngine;
 
 namespace GameWarriors.DependencyInjection.Core
 {
-    //internal enum EServiceLifeType { None, Singleton, Scope, Transient }
-
-    internal class ServiceItem
+    public class TransientServiceItem
     {
-        public object Instance { get; set; }
+        public Type MainType { get; }
         public bool IsChainDepend { get; set; }
-        public ParameterInfo[] CtorParamsArray { get; internal set; }
-        public MethodInfo LoadingMethod { get; internal set; }
+        public ParameterInfo[] ParamsArray { get; internal set; }
         public PropertyInfo[] Properties { get; internal set; }
         public MethodInfo InitMethod { get; internal set; }
-        public ParameterInfo[] InitParamsArray { get; internal set; }
+
+
+        public TransientServiceItem(Type mainType)
+        {
+            MainType = mainType;
+        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void SetupParams(Type mainType, string initMethodName)
+        internal void SetupParams(string initMethodName)
         {
+            Type mainType = MainType;
             if (!mainType.IsSubclassOf(typeof(MonoBehaviour)))
             {
                 ConstructorInfo[] constructors = mainType.GetConstructors();
                 ConstructorInfo firstConstructors = constructors[0];
                 ParameterInfo[] constructorParams = firstConstructors.GetParameters();
-                CtorParamsArray = constructorParams;
+                ParamsArray = constructorParams;
             }
-            Properties = mainType.GetProperties(BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.SetProperty);
-            LoadingMethod = mainType.GetMethod("WaitForLoading", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Public);
-
-            if (!string.IsNullOrEmpty(initMethodName))
+            else
             {
-                InitMethod = mainType.GetMethod(initMethodName, BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Public);
-                if (InitMethod != null)
+                if (!string.IsNullOrEmpty(initMethodName))
                 {
-                    InitParamsArray = InitMethod.GetParameters();
+                    InitMethod = mainType.GetMethod(initMethodName, BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Public);
+                    if (InitMethod != null)
+                    {
+                        ParamsArray = InitMethod.GetParameters();
+                    }
                 }
             }
+            Properties = mainType.GetProperties(BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.SetProperty);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal object CreateInstance(Type mainType, ServiceProvider serviceProvider, Type injectType, ServiceCollection serviceCollection)
+        internal object CreateInstance(ServiceProvider serviceProvider)
         {
-            ParameterInfo[] constructorParams = CtorParamsArray;
+            Type mainType = MainType;
+            ParameterInfo[] constructorParams = ParamsArray;
             object serviceObject;
             if (constructorParams == null && mainType.IsSubclassOf(typeof(MonoBehaviour)))
             {
@@ -61,9 +68,9 @@ namespace GameWarriors.DependencyInjection.Core
                     for (int i = 0; i < length; ++i)
                     {
                         Type argType = constructorParams[i].ParameterType;
-                        if (serviceCollection.IsChainDepend(argType))
-                            throw new Exception($"There are circle dependency reference between type {mainType} & {argType}");
-                        tmp[i] = serviceCollection.ResolveSingletonService(argType);
+                        //if (serviceProvider.TryGetValue(argType, out var serviceItem) && serviceItem.IsChainDepend)
+                        //    throw new Exception($"There are circle dependency reference between type {mainType} & {argType}");
+                        tmp[i] = serviceProvider.GetService(argType);
                     }
 
                     IsChainDepend = false;
@@ -74,13 +81,11 @@ namespace GameWarriors.DependencyInjection.Core
                     serviceObject = Activator.CreateInstance(mainType);
                 }
             }
-            Instance = serviceObject;
-            serviceProvider.SetSingletonService(injectType, serviceObject);
             return serviceObject;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal void SetProperties(ServiceProvider serviceProvider)
+        internal void SetProperties(object instance, ServiceProvider serviceProvider)
         {
             PropertyInfo[] properties = Properties;
             int length = properties?.Length ?? 0;
@@ -92,9 +97,10 @@ namespace GameWarriors.DependencyInjection.Core
                 {
                     object service = serviceProvider.GetService(abstractionType);
                     if (service != null)
-                        properties[i].SetValue(Instance, service);
+                        properties[i].SetValue(instance, service);
                 }
             }
         }
+
     }
 }

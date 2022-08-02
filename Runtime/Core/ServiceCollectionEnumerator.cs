@@ -13,7 +13,6 @@ namespace GameWarriors.DependencyInjection.Core
         private const string WAIT_FOR_LOADING_METHOD_NAME = "WaitForLoadingCoroutine";
         private readonly string INIT_METHOD_NAME;
         private Dictionary<Type, MiniServiceItem> _mainTypeTable;
-        private Dictionary<Type, MiniServiceItem> _transientTable;
         private Dictionary<Type, Type> _abstractionToMainTable;
         private ServiceProvider _serviceProvider;
         private int _loadingCount;
@@ -23,7 +22,6 @@ namespace GameWarriors.DependencyInjection.Core
         {
             INIT_METHOD_NAME = initMethodName;
             _mainTypeTable = new Dictionary<Type, MiniServiceItem>();
-            _transientTable = new Dictionary<Type, MiniServiceItem>();
             _abstractionToMainTable = new Dictionary<Type, Type>();
             _serviceProvider = new ServiceProvider();
             AddSingleton<IServiceProvider, ServiceProvider>(_serviceProvider);
@@ -61,9 +59,7 @@ namespace GameWarriors.DependencyInjection.Core
 
         public void AddTransient<I, T>() where T : class, I where I : IDisposable
         {
-            var item = new MiniServiceItem();
-            _transientTable.Add(typeof(T), item);
-            //TODO need Implementation
+            _serviceProvider.SetTransientService(typeof(I), typeof(T));
         }
 
         public IEnumerator Build(Action onDone = null)
@@ -74,17 +70,6 @@ namespace GameWarriors.DependencyInjection.Core
 
             int counter = 0;
             foreach (var item in _mainTypeTable)
-            {
-                FindLoadingMethod(item);
-                ++counter;
-                if (counter > 50)
-                {
-                    counter = 0;
-                    yield return null;
-                }
-            }
-
-            foreach (var item in _transientTable)
             {
                 FindLoadingMethod(item);
                 ++counter;
@@ -159,7 +144,7 @@ namespace GameWarriors.DependencyInjection.Core
                 }
                 else
                 {
-                    _serviceProvider.SetService(injectType, serviceItem.Instance);
+                    _serviceProvider.SetSingletonService(injectType, serviceItem.Instance);
                 }
             }
         }
@@ -240,7 +225,7 @@ namespace GameWarriors.DependencyInjection.Core
                 }
             }
             item.Instance = serviceObject;
-            _serviceProvider.SetService(injectType, serviceObject);
+            _serviceProvider.SetSingletonService(injectType, serviceObject);
             return serviceObject;
         }
 
@@ -301,12 +286,6 @@ namespace GameWarriors.DependencyInjection.Core
                     return CreateServiceItem(mainType, serviceType, item);
                 }
             }
-            return null;
-        }
-
-        private object ResolveTransientService(Type serviceType)
-        {
-            //TODO Implemenet here
             return null;
         }
 

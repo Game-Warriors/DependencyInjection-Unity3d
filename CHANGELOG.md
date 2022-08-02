@@ -1,3 +1,6 @@
+  version : 0.6.0
+  Initial basic implementation of instantiating transient class from DI.
+  
   version : 0.5.0
   Add Coroutine base service collection named ServiceCollectionEnumerator which use no references to task class or threading namespace in compare to ServiceCollection class.
 

@@ -12,7 +12,6 @@ namespace GameWarriors.DependencyInjection.Core
     {
         private readonly string INIT_METHOD_NAME;
         private Dictionary<Type, ServiceItem> _mainTypeTable;
-        private Dictionary<Type, ServiceItem> _transientTable;
         private Dictionary<Type, Type> _abstractionToMainTable;
         private ServiceProvider _serviceProvider;
         private int _loadingCount;
@@ -22,7 +21,6 @@ namespace GameWarriors.DependencyInjection.Core
         {
             INIT_METHOD_NAME = initMethodName;
             _mainTypeTable = new Dictionary<Type, ServiceItem>();
-            _transientTable = new Dictionary<Type, ServiceItem>();
             _abstractionToMainTable = new Dictionary<Type, Type>();
             if (serviceProvider == null)
                 throw new NullReferenceException("Ther service provider is null");
@@ -33,7 +31,6 @@ namespace GameWarriors.DependencyInjection.Core
         {
             INIT_METHOD_NAME = initMethodName;
             _mainTypeTable = new Dictionary<Type, ServiceItem>();
-            _transientTable = new Dictionary<Type, ServiceItem>();
             _abstractionToMainTable = new Dictionary<Type, Type>();
             _serviceProvider = new ServiceProvider();
             AddSingleton<IServiceProvider, ServiceProvider>(_serviceProvider);
@@ -69,11 +66,16 @@ namespace GameWarriors.DependencyInjection.Core
             _abstractionToMainTable.Add(injectType, mainType);
         }
 
-        public void AddTransient<I, T>() where T : class, I where I : IDisposable
+        public void AddTransient<I, T>() where T : class, I
         {
-            var item = new ServiceItem();
-            _transientTable.Add(typeof(T), item);
-            //TODO need Implementation
+            _serviceProvider.SetTransientService(typeof(I), typeof(T));
+        }
+
+        internal bool IsChainDepend(Type argType)
+        {
+            if (_mainTypeTable.TryGetValue(argType, out var serviceItem) && serviceItem.IsChainDepend)
+                return true;
+            return false;
         }
 
         public async Task Build(Action onDone = null)
@@ -81,7 +83,9 @@ namespace GameWarriors.DependencyInjection.Core
             //System.Diagnostics.Stopwatch stopwatch = new System.Diagnostics.Stopwatch();
             //stopwatch.Start();
             _loadingCount = 0;
-            await Task.WhenAll(Task.Run(() => Parallel.ForEach(_mainTypeTable, FindConstructorParams)), Task.Run(() => Parallel.ForEach(_transientTable, FindConstructorParams)));
+            await Task.WhenAll(
+                Task.Run(() => Parallel.ForEach(_mainTypeTable, FindSingletonConstructorParams)), 
+                Task.Run(() => Parallel.ForEach(_serviceProvider.TransientTable, FindTransientConstructorParams)));
             InitializeSingleton();
             //Task transientTask = Task.Run(InitializeTransient);
             await Task.Run(() => Parallel.ForEach(_mainTypeTable.Values, SetSingletonProperties));
@@ -145,18 +149,13 @@ namespace GameWarriors.DependencyInjection.Core
                 ServiceItem serviceItem = _mainTypeTable[mainType];
                 if (!IsCreated(serviceItem))
                 {
-                    CreateServiceItem(mainType, injectType, serviceItem);
+                    serviceItem.CreateInstance(mainType, _serviceProvider, injectType, this);
                 }
                 else
                 {
-                    _serviceProvider.SetService(injectType, serviceItem.Instance);
+                    _serviceProvider.SetSingletonService(injectType, serviceItem.Instance);
                 }
             }
-        }
-
-        private void InitializeTransient()
-        {
-            //TODO need Implementation
         }
 
         private void AddItem(Type injectType, ServiceItem item)
@@ -165,29 +164,11 @@ namespace GameWarriors.DependencyInjection.Core
                 _mainTypeTable.Add(injectType, item);
         }
 
-        private void FindConstructorParams(KeyValuePair<Type, ServiceItem> input)
+        private void FindSingletonConstructorParams(KeyValuePair<Type, ServiceItem> input)
         {
             Type mainType = input.Key;
             ServiceItem item = input.Value;
-            if (!mainType.IsSubclassOf(typeof(MonoBehaviour)))
-            {
-                ConstructorInfo[] constructors = mainType.GetConstructors();
-                ConstructorInfo firstConstructors = constructors[0];
-                ParameterInfo[] constructorParams = firstConstructors.GetParameters();
-                item.CtorParamsArray = constructorParams;
-            }
-            item.Properties = mainType.GetProperties(BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.SetProperty);
-            item.LoadingMethod = mainType.GetMethod("WaitForLoading", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Public);
-
-            if (!string.IsNullOrEmpty(INIT_METHOD_NAME))
-            {
-                item.InitMethod = mainType.GetMethod(INIT_METHOD_NAME, BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Public);
-                if (item.InitMethod != null)
-                {
-                    item.InitParamsArray = item.InitMethod.GetParameters();
-                }
-            }
-
+            item.SetupParams(mainType, INIT_METHOD_NAME);
             if (item.LoadingMethod != null)
             {
                 lock (_mainTypeTable)
@@ -197,55 +178,15 @@ namespace GameWarriors.DependencyInjection.Core
             }
         }
 
-        private object CreateServiceItem(Type mainType, Type injectType, ServiceItem item)
+        private void FindTransientConstructorParams(KeyValuePair<Type, TransientServiceItem> input)
         {
-            ParameterInfo[] constructorParams = item.CtorParamsArray;
-            object serviceObject;
-            if (constructorParams == null && mainType.IsSubclassOf(typeof(MonoBehaviour)))
-            {
-                serviceObject = new GameObject(mainType.Name, mainType).GetComponent(mainType);
-            }
-            else
-            {
-                int length = constructorParams?.Length ?? 0;
-                if (length > 0)
-                {
-                    item.IsChainDepend = true;
-                    object[] tmp = new object[length];
-                    for (int i = 0; i < length; ++i)
-                    {
-                        Type argType = constructorParams[i].ParameterType;
-                        if (_mainTypeTable.TryGetValue(argType, out var serviceItem) && serviceItem.IsChainDepend)
-                            throw new Exception($"There are circle dependency reference between type {mainType} & {argType}");
-                        tmp[i] = ResolveSingletonService(argType);
-                    }
-
-                    item.IsChainDepend = false;
-                    serviceObject = Activator.CreateInstance(mainType, tmp);
-                }
-                else
-                {
-                    serviceObject = Activator.CreateInstance(mainType);
-                }
-            }
-            item.Instance = serviceObject;
-            _serviceProvider.SetService(injectType, serviceObject);
-            return serviceObject;
+            TransientServiceItem item = input.Value;
+            item.SetupParams(INIT_METHOD_NAME);
         }
 
         private void SetSingletonProperties(ServiceItem targetType)
         {
-            PropertyInfo[] properties = targetType.Properties;
-            int length = properties?.Length ?? 0;
-            for (int i = 0; i < length; ++i)
-            {
-                InjectAttribute attribute = properties[i].GetCustomAttribute<InjectAttribute>();
-                Type abstractionType = properties[i].PropertyType;
-                if (attribute != null && properties[i].CanWrite && _abstractionToMainTable.TryGetValue(abstractionType, out var mainType) && _mainTypeTable.TryGetValue(mainType, out var item))
-                {
-                    properties[i].SetValue(targetType.Instance, item.Instance);
-                }
-            }
+            targetType.SetProperties(_serviceProvider);
         }
 
         private Task InvokeLoading(MethodInfo methodInfo, object instance)
@@ -276,7 +217,7 @@ namespace GameWarriors.DependencyInjection.Core
                 methodInfo.Invoke(instance, null);
         }
 
-        private object ResolveSingletonService(Type serviceType)
+        internal object ResolveSingletonService(Type serviceType)
         {
             if (_abstractionToMainTable.TryGetValue(serviceType, out var mainType) && _mainTypeTable.TryGetValue(mainType, out ServiceItem item))
             {
@@ -287,7 +228,7 @@ namespace GameWarriors.DependencyInjection.Core
                 }
                 else
                 {
-                    return CreateServiceItem(mainType, serviceType, item);
+                    return item.CreateInstance(mainType, _serviceProvider, serviceType, this);
                 }
             }
             return null;
