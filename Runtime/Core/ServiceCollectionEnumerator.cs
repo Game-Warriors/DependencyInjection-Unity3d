@@ -1,3 +1,4 @@
+using GameWarriors.DependencyInjection.Abstraction;
 using GameWarriors.DependencyInjection.Attributes;
 using GameWarriors.DependencyInjection.Data;
 using System;
@@ -8,11 +9,11 @@ using UnityEngine;
 
 namespace GameWarriors.DependencyInjection.Core
 {
-    public class ServiceCollectionEnumerator
+    public class ServiceCollectionEnumerator : IServiceCollection
     {
         private const string WAIT_FOR_LOADING_METHOD_NAME = "WaitForLoadingCoroutine";
         private readonly string INIT_METHOD_NAME;
-        private Dictionary<Type, MiniServiceItem> _mainTypeTable;
+        private Dictionary<Type, IServiceItem> _mainTypeTable;
         private Dictionary<Type, Type> _abstractionToMainTable;
         private ServiceProvider _serviceProvider;
         private int _loadingCount;
@@ -21,7 +22,7 @@ namespace GameWarriors.DependencyInjection.Core
         public ServiceCollectionEnumerator(string initMethodName = default)
         {
             INIT_METHOD_NAME = initMethodName;
-            _mainTypeTable = new Dictionary<Type, MiniServiceItem>();
+            _mainTypeTable = new Dictionary<Type, IServiceItem>();
             _abstractionToMainTable = new Dictionary<Type, Type>();
             _serviceProvider = new ServiceProvider();
             AddSingleton<IServiceProvider, ServiceProvider>(_serviceProvider);
@@ -62,6 +63,17 @@ namespace GameWarriors.DependencyInjection.Core
             _serviceProvider.SetTransientService(typeof(I), typeof(T));
         }
 
+        public bool IsChainDepend(Type argType)
+        {
+            if (_mainTypeTable.TryGetValue(argType, out var serviceItem) && serviceItem.IsChainDepend)
+                return true;
+            return false;
+        }
+
+        public void SetSingletonService(Type injectType, object serviceObject)
+        {
+            _serviceProvider.SetSingletonService(injectType, serviceObject);
+        }
         public IEnumerator Build(Action onDone = null)
         {
             //System.Diagnostics.Stopwatch stopwatch = new System.Diagnostics.Stopwatch();
@@ -82,6 +94,12 @@ namespace GameWarriors.DependencyInjection.Core
 
             yield return null;
             InitializeSingleton();
+
+            foreach (var item in _serviceProvider.TransientTable.Values)
+            {
+                item.SetupParams(INIT_METHOD_NAME);
+            }
+
             yield return null;
             counter = 0;
             foreach (var item in _mainTypeTable)
@@ -122,7 +140,7 @@ namespace GameWarriors.DependencyInjection.Core
 
             foreach (var item in _mainTypeTable)
             {
-                MethodInfo initMethod = GetInitMethod(item.Key);
+                MethodInfo initMethod = item.Key.FindMethod(INIT_METHOD_NAME);
                 if (initMethod != null)
                 {
                     ParameterInfo[] parameterInfos = initMethod.GetParameters();
@@ -137,10 +155,10 @@ namespace GameWarriors.DependencyInjection.Core
             {
                 Type mainType = item.Value;
                 Type injectType = item.Key;
-                MiniServiceItem serviceItem = _mainTypeTable[mainType];
-                if (!IsCreated(serviceItem))
+                IServiceItem serviceItem = _mainTypeTable[mainType];
+                if (!serviceItem.IsCreated())
                 {
-                    CreateServiceItem(mainType, injectType, serviceItem);
+                    serviceItem.CreateInstance(mainType, injectType, this);
                 }
                 else
                 {
@@ -149,89 +167,27 @@ namespace GameWarriors.DependencyInjection.Core
             }
         }
 
-        private void InitializeTransient()
-        {
-            //TODO need Implementation
-        }
-
         private void AddItem(Type injectType, MiniServiceItem item)
         {
             if (!_mainTypeTable.ContainsKey(injectType))
                 _mainTypeTable.Add(injectType, item);
         }
 
-        private void FindLoadingMethod(KeyValuePair<Type, MiniServiceItem> input)
+        private void FindLoadingMethod(KeyValuePair<Type, IServiceItem> input)
         {
             Type mainType = input.Key;
-            MiniServiceItem item = input.Value;
-            item.LoadingMethod = mainType.GetMethod(WAIT_FOR_LOADING_METHOD_NAME, BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Public);
+            IServiceItem item = input.Value;
+
+            item.SetupParams(mainType, INIT_METHOD_NAME, WAIT_FOR_LOADING_METHOD_NAME);
             if (item.LoadingMethod != null)
             {
                 ++_loadingCount;
             }
         }
 
-        private ParameterInfo[] GetConstructorParams(Type mainType)
+        private void SetSingletonProperties(Type targetType, IServiceItem targetItem)
         {
-            if (!mainType.IsSubclassOf(typeof(MonoBehaviour)))
-            {
-                ConstructorInfo[] constructors = mainType.GetConstructors();
-                ConstructorInfo firstConstructors = constructors[0];
-                ParameterInfo[] constructorParams = firstConstructors.GetParameters();
-                return constructorParams;
-            }
-            return null;
-        }
-
-        private PropertyInfo[] GetProperties(Type mainType)
-        {
-            return mainType.GetProperties(BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.SetProperty);
-        }
-
-        private MethodInfo GetInitMethod(Type mainType)
-        {
-            return mainType.GetMethod(INIT_METHOD_NAME, BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Public);
-        }
-
-        private object CreateServiceItem(Type mainType, Type injectType, MiniServiceItem item)
-        {
-            ParameterInfo[] constructorParams = GetConstructorParams(mainType);
-            object serviceObject;
-            if (constructorParams == null && mainType.IsSubclassOf(typeof(MonoBehaviour)))
-            {
-                serviceObject = new GameObject(mainType.Name, mainType).GetComponent(mainType);
-            }
-            else
-            {
-                int length = constructorParams?.Length ?? 0;
-                if (length > 0)
-                {
-                    item.IsChainDepend = true;
-                    object[] tmp = new object[length];
-                    for (int i = 0; i < length; ++i)
-                    {
-                        Type argType = constructorParams[i].ParameterType;
-                        if (_mainTypeTable.TryGetValue(argType, out var serviceItem) && serviceItem.IsChainDepend)
-                            throw new Exception($"There are circle dependency reference between type {mainType} & {argType}");
-                        tmp[i] = ResolveSingletonService(argType);
-                    }
-
-                    item.IsChainDepend = false;
-                    serviceObject = Activator.CreateInstance(mainType, tmp);
-                }
-                else
-                {
-                    serviceObject = Activator.CreateInstance(mainType);
-                }
-            }
-            item.Instance = serviceObject;
-            _serviceProvider.SetSingletonService(injectType, serviceObject);
-            return serviceObject;
-        }
-
-        private void SetSingletonProperties(Type targetType, MiniServiceItem targetItem)
-        {
-            PropertyInfo[] properties = GetProperties(targetType);
+            PropertyInfo[] properties = targetType.FindProperties();
             int length = properties?.Length ?? 0;
             for (int i = 0; i < length; ++i)
             {
@@ -261,7 +217,7 @@ namespace GameWarriors.DependencyInjection.Core
                 for (int i = 0; i < length; ++i)
                 {
                     Type argType = infos[i].ParameterType;
-                    if (_abstractionToMainTable.TryGetValue(argType, out var mainType) && _mainTypeTable.TryGetValue(mainType, out MiniServiceItem item))
+                    if (_abstractionToMainTable.TryGetValue(argType, out var mainType) && _mainTypeTable.TryGetValue(mainType, out var item))
                     {
                         tmp[i] = item.Instance;
                     }
@@ -272,9 +228,9 @@ namespace GameWarriors.DependencyInjection.Core
                 methodInfo.Invoke(instance, null);
         }
 
-        private object ResolveSingletonService(Type serviceType)
+        public object ResolveSingletonService(Type serviceType)
         {
-            if (_abstractionToMainTable.TryGetValue(serviceType, out var mainType) && _mainTypeTable.TryGetValue(mainType, out MiniServiceItem item))
+            if (_abstractionToMainTable.TryGetValue(serviceType, out var mainType) && _mainTypeTable.TryGetValue(mainType, out var item))
             {
                 if (item.Instance != null)
                 {
@@ -283,15 +239,11 @@ namespace GameWarriors.DependencyInjection.Core
                 }
                 else
                 {
-                    return CreateServiceItem(mainType, serviceType, item);
+                    return item.CreateInstance(mainType, serviceType, this);
                 }
             }
             return null;
         }
 
-        private bool IsCreated(MiniServiceItem serviceItem)
-        {
-            return serviceItem.Instance != null;
-        }
     }
 }

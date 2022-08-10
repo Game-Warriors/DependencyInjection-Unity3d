@@ -1,11 +1,7 @@
 using GameWarriors.DependencyInjection.Attributes;
-using GameWarriors.DependencyInjection.Core;
 using System;
-using System.Collections;
-using System.Collections.Generic;
 using System.Reflection;
 using System.Runtime.CompilerServices;
-using UnityEngine;
 
 namespace GameWarriors.DependencyInjection.Core
 {
@@ -27,61 +23,67 @@ namespace GameWarriors.DependencyInjection.Core
         internal void SetupParams(string initMethodName)
         {
             Type mainType = MainType;
-            if (!mainType.IsSubclassOf(typeof(MonoBehaviour)))
+            if (!mainType.IsUnityMonoBehaviour())
             {
-                ConstructorInfo[] constructors = mainType.GetConstructors();
-                ConstructorInfo firstConstructors = constructors[0];
-                ParameterInfo[] constructorParams = firstConstructors.GetParameters();
-                ParamsArray = constructorParams;
+                ParamsArray = mainType.GetConstructorParams();
             }
             else
             {
                 if (!string.IsNullOrEmpty(initMethodName))
                 {
-                    InitMethod = mainType.GetMethod(initMethodName, BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Public);
+                    InitMethod = mainType.FindMethod(initMethodName);
                     if (InitMethod != null)
                     {
                         ParamsArray = InitMethod.GetParameters();
                     }
                 }
             }
-            Properties = mainType.GetProperties(BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.SetProperty);
+            Properties = mainType.FindProperties();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal object CreateInstance(ServiceProvider serviceProvider)
         {
-            Type mainType = MainType;
-            ParameterInfo[] constructorParams = ParamsArray;
-            object serviceObject;
-            if (constructorParams == null && mainType.IsSubclassOf(typeof(MonoBehaviour)))
+            try
             {
-                serviceObject = new GameObject(mainType.Name, mainType).GetComponent(mainType);
-            }
-            else
-            {
-                int length = constructorParams?.Length ?? 0;
-                if (length > 0)
+                Type mainType = MainType;
+                ParameterInfo[] constructorParams = ParamsArray;
+                object serviceObject;
+                if (constructorParams == null && mainType.IsUnityMonoBehaviour())
                 {
-                    IsChainDepend = true;
-                    object[] tmp = new object[length];
-                    for (int i = 0; i < length; ++i)
-                    {
-                        Type argType = constructorParams[i].ParameterType;
-                        //if (serviceProvider.TryGetValue(argType, out var serviceItem) && serviceItem.IsChainDepend)
-                        //    throw new Exception($"There are circle dependency reference between type {mainType} & {argType}");
-                        tmp[i] = serviceProvider.GetService(argType);
-                    }
-
-                    IsChainDepend = false;
-                    serviceObject = Activator.CreateInstance(mainType, tmp);
+                    serviceObject = mainType.CreateUnityGameObject();
                 }
                 else
                 {
-                    serviceObject = Activator.CreateInstance(mainType);
+                    int length = constructorParams?.Length ?? 0;
+                    if (length > 0)
+                    {
+                        IsChainDepend = true;
+                        object[] tmp = new object[length];
+                        for (int i = 0; i < length; ++i)
+                        {
+                            Type argType = constructorParams[i].ParameterType;
+                            //if (serviceProvider.TryGetValue(argType, out var serviceItem) && serviceItem.IsChainDepend)
+                            //    throw new Exception($"There are circle dependency reference between type {mainType} & {argType}");
+                            tmp[i] = serviceProvider.GetService(argType);
+                        }
+
+                        IsChainDepend = false;
+                        serviceObject = Activator.CreateInstance(mainType, tmp);
+                    }
+                    else
+                    {
+                        serviceObject = Activator.CreateInstance(mainType);
+                    }
                 }
+                return serviceObject;
             }
-            return serviceObject;
+            catch (Exception E)
+            {
+                this.LogError("Exception in CreateInstance method, " +  E.Message);
+                return null;
+            }
+
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

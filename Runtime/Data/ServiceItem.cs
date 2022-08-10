@@ -1,15 +1,15 @@
-﻿using GameWarriors.DependencyInjection.Attributes;
+﻿using GameWarriors.DependencyInjection.Abstraction;
+using GameWarriors.DependencyInjection.Attributes;
 using GameWarriors.DependencyInjection.Core;
 using System;
 using System.Reflection;
 using System.Runtime.CompilerServices;
-using UnityEngine;
 
 namespace GameWarriors.DependencyInjection.Core
 {
     //internal enum EServiceLifeType { None, Singleton, Scope, Transient }
 
-    internal class ServiceItem
+    internal class ServiceItem : IServiceItem
     {
         public object Instance { get; set; }
         public bool IsChainDepend { get; set; }
@@ -20,21 +20,18 @@ namespace GameWarriors.DependencyInjection.Core
         public ParameterInfo[] InitParamsArray { get; internal set; }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void SetupParams(Type mainType, string initMethodName)
+        public void SetupParams(Type mainType, string initMethodName, string loadingMethodName)
         {
-            if (!mainType.IsSubclassOf(typeof(MonoBehaviour)))
+            if (!mainType.IsUnityMonoBehaviour())
             {
-                ConstructorInfo[] constructors = mainType.GetConstructors();
-                ConstructorInfo firstConstructors = constructors[0];
-                ParameterInfo[] constructorParams = firstConstructors.GetParameters();
-                CtorParamsArray = constructorParams;
+                CtorParamsArray = mainType.GetConstructorParams();
             }
-            Properties = mainType.GetProperties(BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.SetProperty);
-            LoadingMethod = mainType.GetMethod("WaitForLoading", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Public);
+            Properties = mainType.FindProperties();
+            LoadingMethod = mainType.FindMethod(loadingMethodName);
 
             if (!string.IsNullOrEmpty(initMethodName))
             {
-                InitMethod = mainType.GetMethod(initMethodName, BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Public);
+                InitMethod = mainType.FindMethod(initMethodName);
                 if (InitMethod != null)
                 {
                     InitParamsArray = InitMethod.GetParameters();
@@ -43,13 +40,13 @@ namespace GameWarriors.DependencyInjection.Core
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal object CreateInstance(Type mainType, ServiceProvider serviceProvider, Type injectType, ServiceCollection serviceCollection)
+        public object CreateInstance(Type mainType, Type injectType, IServiceCollection serviceCollection)
         {
             ParameterInfo[] constructorParams = CtorParamsArray;
             object serviceObject;
-            if (constructorParams == null && mainType.IsSubclassOf(typeof(MonoBehaviour)))
+            if (constructorParams == null && mainType.IsUnityMonoBehaviour())
             {
-                serviceObject = new GameObject(mainType.Name, mainType).GetComponent(mainType);
+                serviceObject = mainType.CreateUnityGameObject(); 
             }
             else
             {
@@ -75,12 +72,12 @@ namespace GameWarriors.DependencyInjection.Core
                 }
             }
             Instance = serviceObject;
-            serviceProvider.SetSingletonService(injectType, serviceObject);
+            serviceCollection.SetSingletonService(injectType, serviceObject);
             return serviceObject;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal void SetProperties(ServiceProvider serviceProvider)
+        public void SetProperties(IServiceProvider serviceProvider)
         {
             PropertyInfo[] properties = Properties;
             int length = properties?.Length ?? 0;

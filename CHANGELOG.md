@@ -1,3 +1,6 @@
+  version : 0.7.0
+  Implementation new instantiating transient class from DI for ServiceCollectionEnumerator.
+
   version : 0.6.0
   Initial basic implementation of instantiating transient class from DI.
   
