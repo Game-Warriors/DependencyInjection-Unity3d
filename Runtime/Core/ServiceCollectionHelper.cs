@@ -59,9 +59,17 @@ namespace GameWarriors.DependencyInjection.Core
             if (!mainType.IsUnityMonoBehaviour())
             {
                 ConstructorInfo[] constructors = mainType.GetConstructors();
-                ConstructorInfo firstConstructors = constructors[0];
-                ParameterInfo[] constructorParams = firstConstructors.GetParameters();
-                return constructorParams;
+                if (constructors != null && constructors.Length > 0)
+                {
+                    ConstructorInfo firstConstructors = constructors[0];
+                    ParameterInfo[] constructorParams = firstConstructors.GetParameters();
+                    return constructorParams;
+                }
+                else
+                {
+                    LogError(mainType, $"error in GetConstructorParams");
+                    return null;
+                }
             }
             return null;
         }
