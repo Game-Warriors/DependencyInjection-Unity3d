@@ -3,7 +3,7 @@ using System;
 
 namespace GameWarriors.DependencyInjection.Abstraction
 {
-    internal interface IServiceCollection
+    public interface IServiceCollection
     {
         bool IsChainDepend(Type argType);
         object ResolveSingletonService(Type argType);

@@ -1,6 +1,5 @@
-﻿using GameWarriors.DependencyInjection.Data;
+﻿using GameWarriors.DependencyInjection.Abstraction;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 
 namespace GameWarriors.DependencyInjection.Core
@@ -8,14 +7,14 @@ namespace GameWarriors.DependencyInjection.Core
     public class ServiceProvider : IServiceProvider
     {
         private readonly ServiceLocator _singletonLocator;
-        private Dictionary<Type, TransientServiceItem> _transienTable;
+        private Dictionary<Type, IObjectFactory> _transienTable;
 
-        public IDictionary<Type, TransientServiceItem> TransientTable => _transienTable;
+        public IDictionary<Type, IObjectFactory> TransientTable => _transienTable;
 
         public ServiceProvider(int size = 25)
         {
             _singletonLocator = new ServiceLocator(size);
-            _transienTable = new Dictionary<Type, TransientServiceItem>(size);
+            _transienTable = new Dictionary<Type, IObjectFactory>(size);
         }
 
         public void SetSingletonService(Type injectType, object serviceObject)
@@ -23,9 +22,16 @@ namespace GameWarriors.DependencyInjection.Core
             _singletonLocator.Register(injectType, serviceObject);
         }
 
-        public void SetTransientService(Type injectType,Type mainType)
+        public ITransientServiceItem SetTransientService(Type injectType, Type mainType)
         {
-            _transienTable.Add(injectType, new TransientServiceItem(mainType));
+            TransientServiceItem item = new TransientServiceItem(mainType);
+            _transienTable.Add(injectType, item);
+            return item;
+        }
+
+        public void SetTransientService(Type injectType, IObjectFactory ServiceItem)
+        {
+            _transienTable.Add(injectType, ServiceItem);
         }
 
         public object GetService(Type serviceType)
@@ -35,10 +41,8 @@ namespace GameWarriors.DependencyInjection.Core
             {
                 if (_transienTable.TryGetValue(serviceType, out var item))
                 {
-                    service = item.CreateInstance(this);
-                    item.SetProperties(service, this);
+                    service = item.CreateObject(this);
                 }
-
             }
             return service;
         }

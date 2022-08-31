@@ -4,7 +4,7 @@ using System.Runtime.CompilerServices;
 
 namespace GameWarriors.DependencyInjection.Abstraction
 {
-    internal interface IServiceItem
+    public interface IServiceItem
     {
         MethodInfo LoadingMethod { get; }
         bool IsChainDepend { get; }
@@ -15,6 +15,8 @@ namespace GameWarriors.DependencyInjection.Abstraction
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         void SetProperties(IServiceProvider serviceProvider);
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         object CreateInstance(Type mainType, Type injectType, IServiceCollection serviceCollection);
     }
 }

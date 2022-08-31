@@ -1,11 +1,9 @@
 using GameWarriors.DependencyInjection.Abstraction;
 using GameWarriors.DependencyInjection.Attributes;
-using GameWarriors.DependencyInjection.Data;
 using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
-using UnityEngine;
 
 namespace GameWarriors.DependencyInjection.Core
 {
@@ -15,6 +13,7 @@ namespace GameWarriors.DependencyInjection.Core
         private readonly string INIT_METHOD_NAME;
         private Dictionary<Type, IServiceItem> _mainTypeTable;
         private Dictionary<Type, Type> _abstractionToMainTable;
+        private List<ITransientServiceItem> _transientItems;
         private ServiceProvider _serviceProvider;
         private int _loadingCount;
 
@@ -24,6 +23,7 @@ namespace GameWarriors.DependencyInjection.Core
             INIT_METHOD_NAME = initMethodName;
             _mainTypeTable = new Dictionary<Type, IServiceItem>();
             _abstractionToMainTable = new Dictionary<Type, Type>();
+            _transientItems = new List<ITransientServiceItem>();
             _serviceProvider = new ServiceProvider();
             AddSingleton<IServiceProvider, ServiceProvider>(_serviceProvider);
         }
@@ -58,19 +58,30 @@ namespace GameWarriors.DependencyInjection.Core
             _abstractionToMainTable.Add(injectType, mainType);
         }
 
-        public void AddTransient<I, T>() where T : class, I where I : IDisposable
+        public void AddTransient<I, T>() where T : class, I
         {
-            _serviceProvider.SetTransientService(typeof(I), typeof(T));
+            ITransientServiceItem item = _serviceProvider.SetTransientService(typeof(I), typeof(T));
+            _transientItems.Add(item);
         }
 
-        public bool IsChainDepend(Type argType)
+        public void AddTransient<I, T>(Func<IServiceProvider, I> factoryMethod, bool isFillProperties = true) where T : class, I
+        {
+            _serviceProvider.SetTransientService(typeof(I), new MethodFactory<I>(typeof(T), factoryMethod, isFillProperties));
+        }
+
+        //public void AddTransient<I, T>(IServiceFactory<T> serviceFactory) where T : class, I
+        //{
+        //    _serviceProvider.SetTransientService(typeof(I), serviceFactory);
+        //}
+
+        bool IServiceCollection.IsChainDepend(Type argType)
         {
             if (_mainTypeTable.TryGetValue(argType, out var serviceItem) && serviceItem.IsChainDepend)
                 return true;
             return false;
         }
 
-        public void SetSingletonService(Type injectType, object serviceObject)
+        void IServiceCollection.SetSingletonService(Type injectType, object serviceObject)
         {
             _serviceProvider.SetSingletonService(injectType, serviceObject);
         }
@@ -95,7 +106,7 @@ namespace GameWarriors.DependencyInjection.Core
             yield return null;
             InitializeSingleton();
 
-            foreach (var item in _serviceProvider.TransientTable.Values)
+            foreach (var item in _transientItems)
             {
                 item.SetupParams(INIT_METHOD_NAME);
             }
@@ -144,7 +155,7 @@ namespace GameWarriors.DependencyInjection.Core
                 if (initMethod != null)
                 {
                     ParameterInfo[] parameterInfos = initMethod.GetParameters();
-                    InvokeInit(initMethod, parameterInfos, item.Value.Instance);
+                    this.InvokeInit(initMethod, parameterInfos, item.Value.Instance);
                 }
             }
         }
@@ -206,26 +217,6 @@ namespace GameWarriors.DependencyInjection.Core
             if (tmp == null)
                 UnityEngine.Debug.LogError(instance);
             return tmp;
-        }
-
-        private void InvokeInit(MethodInfo methodInfo, ParameterInfo[] infos, object instance)
-        {
-            int length = infos?.Length ?? 0;
-            if (length > 0)
-            {
-                object[] tmp = new object[length];
-                for (int i = 0; i < length; ++i)
-                {
-                    Type argType = infos[i].ParameterType;
-                    if (_abstractionToMainTable.TryGetValue(argType, out var mainType) && _mainTypeTable.TryGetValue(mainType, out var item))
-                    {
-                        tmp[i] = item.Instance;
-                    }
-                }
-                methodInfo.Invoke(instance, tmp);
-            }
-            else
-                methodInfo.Invoke(instance, null);
         }
 
         public object ResolveSingletonService(Type serviceType)

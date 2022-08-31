@@ -1,3 +1,6 @@
+  version : 0.8.0
+  Improve service collection structure, fix MonoBehaviour transient bug and add factory method to transient instantiation.
+
   version : 0.7.0
   Implementation new instantiating transient class from DI for ServiceCollectionEnumerator.
 

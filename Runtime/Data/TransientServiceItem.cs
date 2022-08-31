@@ -1,17 +1,19 @@
+using GameWarriors.DependencyInjection.Abstraction;
 using GameWarriors.DependencyInjection.Attributes;
+using GameWarriors.DependencyInjection.Extensions;
 using System;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 
 namespace GameWarriors.DependencyInjection.Core
 {
-    public class TransientServiceItem
+    internal class TransientServiceItem : IObjectFactory, ITransientServiceItem
     {
         public Type MainType { get; }
         public bool IsChainDepend { get; set; }
         public ParameterInfo[] ParamsArray { get; internal set; }
-        public PropertyInfo[] Properties { get; internal set; }
         public MethodInfo InitMethod { get; internal set; }
+        private PropertyInfo[] Properties { get; set; }
 
 
         public TransientServiceItem(Type mainType)
@@ -20,38 +22,37 @@ namespace GameWarriors.DependencyInjection.Core
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal void SetupParams(string initMethodName)
+        public void SetupParams(string initMethodName)
         {
             Type mainType = MainType;
             if (!mainType.IsUnityMonoBehaviour())
             {
                 ParamsArray = mainType.GetConstructorParams();
             }
-            else
+            else if (!string.IsNullOrEmpty(initMethodName))
             {
-                if (!string.IsNullOrEmpty(initMethodName))
+                InitMethod = mainType.FindMethod(initMethodName);
+                if (InitMethod != null)
                 {
-                    InitMethod = mainType.FindMethod(initMethodName);
-                    if (InitMethod != null)
-                    {
-                        ParamsArray = InitMethod.GetParameters();
-                    }
+                    ParamsArray = InitMethod.GetParameters();
                 }
             }
             Properties = mainType.FindProperties();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal object CreateInstance(ServiceProvider serviceProvider)
+        public object CreateObject(IServiceProvider serviceProvider)
         {
             try
             {
                 Type mainType = MainType;
                 ParameterInfo[] constructorParams = ParamsArray;
                 object serviceObject;
-                if (constructorParams == null && mainType.IsUnityMonoBehaviour())
+                if (mainType.IsUnityMonoBehaviour())
                 {
                     serviceObject = mainType.CreateUnityGameObject();
+                    serviceProvider.SetProperties(serviceObject, Properties);
+                    serviceProvider.InvokeInitMethod(serviceObject, InitMethod, ParamsArray);
                 }
                 else
                 {
@@ -75,33 +76,16 @@ namespace GameWarriors.DependencyInjection.Core
                     {
                         serviceObject = Activator.CreateInstance(mainType);
                     }
+                    serviceProvider.SetProperties(serviceObject, Properties);
                 }
                 return serviceObject;
             }
             catch (Exception E)
             {
-                this.LogError("Exception in CreateInstance method, " +  E.Message);
+                this.LogError("Exception in CreateInstance method, " + E.Message);
                 return null;
             }
 
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal void SetProperties(object instance, ServiceProvider serviceProvider)
-        {
-            PropertyInfo[] properties = Properties;
-            int length = properties?.Length ?? 0;
-            for (int i = 0; i < length; ++i)
-            {
-                InjectAttribute attribute = properties[i].GetCustomAttribute<InjectAttribute>();
-                Type abstractionType = properties[i].PropertyType;
-                if (attribute != null && properties[i].CanWrite)
-                {
-                    object service = serviceProvider.GetService(abstractionType);
-                    if (service != null)
-                        properties[i].SetValue(instance, service);
-                }
-            }
         }
 
     }

@@ -13,28 +13,27 @@ namespace GameWarriors.DependencyInjection.Core
         private readonly string INIT_METHOD_NAME;
         private Dictionary<Type, IServiceItem> _mainTypeTable;
         private Dictionary<Type, Type> _abstractionToMainTable;
+        private List<ITransientServiceItem> _transientItems;
         private ServiceProvider _serviceProvider;
         private int _loadingCount;
 
+        public ServiceCollection(string initMethodName = default) : this (new ServiceProvider(), initMethodName)
+        {
+        }
 
         public ServiceCollection(ServiceProvider serviceProvider, string initMethodName = default)
         {
             INIT_METHOD_NAME = initMethodName;
             _mainTypeTable = new Dictionary<Type, IServiceItem>();
             _abstractionToMainTable = new Dictionary<Type, Type>();
+            _transientItems = new List<ITransientServiceItem>();
             if (serviceProvider == null)
                 throw new NullReferenceException("Ther service provider is null");
+            _serviceProvider = serviceProvider;
             AddSingleton<IServiceProvider, ServiceProvider>(_serviceProvider);
         }
 
-        public ServiceCollection(string initMethodName = default)
-        {
-            INIT_METHOD_NAME = initMethodName;
-            _mainTypeTable = new Dictionary<Type, IServiceItem>();
-            _abstractionToMainTable = new Dictionary<Type, Type>();
-            _serviceProvider = new ServiceProvider();
-            AddSingleton<IServiceProvider, ServiceProvider>(_serviceProvider);
-        }
+
 
         public void AddSingleton<T>() where T : class
         {
@@ -68,8 +67,19 @@ namespace GameWarriors.DependencyInjection.Core
 
         public void AddTransient<I, T>() where T : class, I
         {
-            _serviceProvider.SetTransientService(typeof(I), typeof(T));
+            ITransientServiceItem item = _serviceProvider.SetTransientService(typeof(I), typeof(T));
+            _transientItems.Add(item);
         }
+
+        public void AddTransient<I, T>(Func<IServiceProvider, I> factoryMethod, bool isFillProperties = true) where T : class, I
+        {
+            _serviceProvider.SetTransientService(typeof(I), new MethodFactory<I>(typeof(T), factoryMethod, isFillProperties));
+        }
+
+        //public void AddTransient<I, T, Y>(Y factoryInstance = default) where T : class, I where Y : IServiceFactory<I>
+        //{
+        //    _serviceProvider.SetTransientService(typeof(I), factoryInstance);
+        //}
 
         public bool IsChainDepend(Type argType)
         {
@@ -92,7 +102,7 @@ namespace GameWarriors.DependencyInjection.Core
                 _loadingCount = 0;
                 await Task.WhenAll(
                     Task.Run(() => Parallel.ForEach(_mainTypeTable, FindSingletonConstructorParams)),
-                    Task.Run(() => Parallel.ForEach(_serviceProvider.TransientTable, FindTransientConstructorParams)));
+                    Task.Run(() => Parallel.ForEach(_transientItems, FindTransientConstructorParams)));
                 InitializeSingleton();
                 //Task transientTask = Task.Run(InitializeTransient);
                 await Task.Run(() => Parallel.ForEach(_mainTypeTable.Values, SetSingletonProperties));
@@ -133,7 +143,7 @@ namespace GameWarriors.DependencyInjection.Core
             {
                 if (item.InitMethod != null)
                 {
-                    InvokeInit(item.InitMethod, item.InitParamsArray, item.Instance);
+                    this.InvokeInit(item.InitMethod, item.InitParamsArray, item.Instance);
                 }
             }
         }
@@ -183,9 +193,8 @@ namespace GameWarriors.DependencyInjection.Core
             }
         }
 
-        private void FindTransientConstructorParams(KeyValuePair<Type, TransientServiceItem> input)
+        private void FindTransientConstructorParams(ITransientServiceItem item)
         {
-            TransientServiceItem item = input.Value;
             item.SetupParams(INIT_METHOD_NAME);
         }
 
@@ -200,26 +209,6 @@ namespace GameWarriors.DependencyInjection.Core
             if (tmp == null)
                 UnityEngine.Debug.LogError(instance);
             return tmp;
-        }
-
-        private void InvokeInit(MethodInfo methodInfo, ParameterInfo[] infos, object instance)
-        {
-            int length = infos?.Length ?? 0;
-            if (length > 0)
-            {
-                object[] tmp = new object[length];
-                for (int i = 0; i < length; ++i)
-                {
-                    Type argType = infos[i].ParameterType;
-                    if (_abstractionToMainTable.TryGetValue(argType, out var mainType) && _mainTypeTable.TryGetValue(mainType, out var item))
-                    {
-                        tmp[i] = item.Instance;
-                    }
-                }
-                methodInfo.Invoke(instance, tmp);
-            }
-            else
-                methodInfo.Invoke(instance, null);
         }
 
         public object ResolveSingletonService(Type serviceType)

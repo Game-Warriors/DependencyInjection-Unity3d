@@ -1,13 +1,11 @@
 ﻿using GameWarriors.DependencyInjection.Abstraction;
-using GameWarriors.DependencyInjection.Attributes;
-using GameWarriors.DependencyInjection.Core;
+using GameWarriors.DependencyInjection.Extensions;
 using System;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 
 namespace GameWarriors.DependencyInjection.Core
 {
-    //internal enum EServiceLifeType { None, Singleton, Scope, Transient }
 
     internal class ServiceItem : IServiceItem
     {
@@ -15,9 +13,9 @@ namespace GameWarriors.DependencyInjection.Core
         public bool IsChainDepend { get; set; }
         public ParameterInfo[] CtorParamsArray { get; internal set; }
         public MethodInfo LoadingMethod { get; internal set; }
-        public PropertyInfo[] Properties { get; internal set; }
         public MethodInfo InitMethod { get; internal set; }
         public ParameterInfo[] InitParamsArray { get; internal set; }
+        private PropertyInfo[] Properties { get; set; }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void SetupParams(Type mainType, string initMethodName, string loadingMethodName)
@@ -26,9 +24,8 @@ namespace GameWarriors.DependencyInjection.Core
             {
                 CtorParamsArray = mainType.GetConstructorParams();
             }
-            Properties = mainType.FindProperties();
             LoadingMethod = mainType.FindMethod(loadingMethodName);
-
+            Properties = mainType.FindProperties();
             if (!string.IsNullOrEmpty(initMethodName))
             {
                 InitMethod = mainType.FindMethod(initMethodName);
@@ -46,7 +43,7 @@ namespace GameWarriors.DependencyInjection.Core
             object serviceObject;
             if (constructorParams == null && mainType.IsUnityMonoBehaviour())
             {
-                serviceObject = mainType.CreateUnityGameObject(); 
+                serviceObject = mainType.CreateUnityGameObject();
             }
             else
             {
@@ -79,19 +76,7 @@ namespace GameWarriors.DependencyInjection.Core
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void SetProperties(IServiceProvider serviceProvider)
         {
-            PropertyInfo[] properties = Properties;
-            int length = properties?.Length ?? 0;
-            for (int i = 0; i < length; ++i)
-            {
-                InjectAttribute attribute = properties[i].GetCustomAttribute<InjectAttribute>();
-                Type abstractionType = properties[i].PropertyType;
-                if (attribute != null && properties[i].CanWrite)
-                {
-                    object service = serviceProvider.GetService(abstractionType);
-                    if (service != null)
-                        properties[i].SetValue(Instance, service);
-                }
-            }
+            serviceProvider.SetProperties(Instance, Properties);
         }
     }
 }
