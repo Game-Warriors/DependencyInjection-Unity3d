@@ -85,7 +85,7 @@ namespace GameWarriors.DependencyInjection.Core
         {
             _serviceProvider.SetSingletonService(injectType, serviceObject);
         }
-        public IEnumerator Build(Action onDone = null)
+        public IEnumerator Build(Action<IServiceProvider> onDone = null)
         {
             //System.Diagnostics.Stopwatch stopwatch = new System.Diagnostics.Stopwatch();
             //stopwatch.Start();
@@ -141,7 +141,7 @@ namespace GameWarriors.DependencyInjection.Core
             WaitInitAll();
             //stopwatch.Stop();
             //UnityEngine.Debug.Log(stopwatch.ElapsedTicks);
-            onDone?.Invoke();
+            onDone?.Invoke(_serviceProvider);
         }
 
         private void WaitInitAll()

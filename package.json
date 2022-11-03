@@ -1,9 +1,9 @@
 {
   "name": "com.gamewarriors.dependencyinjection",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "displayName": "Dependency Injection",
   "description": "This package provide dependency injection for unity3d",
-  "unity": "2019.1",
+  "unity": "2020.3",
   "unityRelease": "0b5",
   "dependencies": {
   },

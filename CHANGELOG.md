@@ -1,3 +1,6 @@
+  version : 0.8.1
+  Add IServiceProvider object as argument to startup method callback
+
   version : 0.8.0
   Improve service collection structure, fix MonoBehaviour transient bug and add factory method to transient instantiation.
 

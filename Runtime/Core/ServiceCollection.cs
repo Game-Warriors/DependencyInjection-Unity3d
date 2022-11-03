@@ -93,7 +93,7 @@ namespace GameWarriors.DependencyInjection.Core
             _serviceProvider.SetSingletonService(injectType, serviceObject);
         }
 
-        public async Task Build(Action onDone = null)
+        public async Task Build(Action<IServiceProvider> onDone = null)
         {
             //try
             {
@@ -112,7 +112,7 @@ namespace GameWarriors.DependencyInjection.Core
                 WaitInitAll();
                 //stopwatch.Stop();
                 //UnityEngine.Debug.Log(stopwatch.ElapsedTicks);
-                onDone?.Invoke();
+                onDone?.Invoke(_serviceProvider);
             }
             //catch (Exception ex)
             //{
