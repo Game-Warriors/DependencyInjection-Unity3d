@@ -1,5 +1,6 @@
 using GameWarriors.DependencyInjection.Abstraction;
 using GameWarriors.DependencyInjection.Attributes;
+using GameWarriors.DependencyInjection.Extensions;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -15,8 +16,8 @@ namespace GameWarriors.DependencyInjection.Core
         private Dictionary<Type, Type> _abstractionToMainTable;
         private List<ITransientServiceItem> _transientItems;
         private ServiceProvider _serviceProvider;
+        private DependencyHistory _dependencyHistory;
         private int _loadingCount;
-
 
         public ServiceCollectionEnumerator(string initMethodName = default)
         {
@@ -26,6 +27,7 @@ namespace GameWarriors.DependencyInjection.Core
             _transientItems = new List<ITransientServiceItem>();
             _serviceProvider = new ServiceProvider();
             AddSingleton<IServiceProvider, ServiceProvider>(_serviceProvider);
+            _dependencyHistory = new DependencyHistory();
         }
 
         public void AddSingleton<T>() where T : class
@@ -76,8 +78,8 @@ namespace GameWarriors.DependencyInjection.Core
 
         bool IServiceCollection.IsChainDepend(Type argType)
         {
-            if (_mainTypeTable.TryGetValue(argType, out var serviceItem) && serviceItem.IsChainDepend)
-                return true;
+            //if (_mainTypeTable.TryGetValue(argType, out var serviceItem) && serviceItem.IsChainDepend)
+            //    return true;
             return false;
         }
 
@@ -169,7 +171,7 @@ namespace GameWarriors.DependencyInjection.Core
                 IServiceItem serviceItem = _mainTypeTable[mainType];
                 if (!serviceItem.IsCreated())
                 {
-                    serviceItem.CreateInstance(mainType, injectType, this);
+                    serviceItem.CreateInstance(mainType, injectType, _dependencyHistory, this);
                 }
                 else
                 {
@@ -230,7 +232,7 @@ namespace GameWarriors.DependencyInjection.Core
                 }
                 else
                 {
-                    return item.CreateInstance(mainType, serviceType, this);
+                    return item.CreateInstance(mainType, serviceType, _dependencyHistory, this);
                 }
             }
             return null;

@@ -1,5 +1,4 @@
 using GameWarriors.DependencyInjection.Abstraction;
-using GameWarriors.DependencyInjection.Attributes;
 using GameWarriors.DependencyInjection.Extensions;
 using System;
 using System.Reflection;

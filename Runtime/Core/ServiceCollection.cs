@@ -1,9 +1,9 @@
 ﻿using GameWarriors.DependencyInjection.Abstraction;
+using GameWarriors.DependencyInjection.Extensions;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Threading.Tasks;
-using UnityEngine;
 
 namespace GameWarriors.DependencyInjection.Core
 {
@@ -15,9 +15,10 @@ namespace GameWarriors.DependencyInjection.Core
         private Dictionary<Type, Type> _abstractionToMainTable;
         private List<ITransientServiceItem> _transientItems;
         private ServiceProvider _serviceProvider;
+        private DependencyHistory _dependencyHistory;
         private int _loadingCount;
 
-        public ServiceCollection(string initMethodName = default) : this (new ServiceProvider(), initMethodName)
+        public ServiceCollection(string initMethodName = default) : this(new ServiceProvider(), initMethodName)
         {
         }
 
@@ -30,6 +31,7 @@ namespace GameWarriors.DependencyInjection.Core
             if (serviceProvider == null)
                 throw new NullReferenceException("Ther service provider is null");
             _serviceProvider = serviceProvider;
+            _dependencyHistory = new DependencyHistory();
             AddSingleton<IServiceProvider, ServiceProvider>(_serviceProvider);
         }
 
@@ -83,8 +85,8 @@ namespace GameWarriors.DependencyInjection.Core
 
         public bool IsChainDepend(Type argType)
         {
-            if (_mainTypeTable.TryGetValue(argType, out var serviceItem) && serviceItem.IsChainDepend)
-                return true;
+            //if (_mainTypeTable.TryGetValue(argType, out var serviceItem) && serviceItem.IsChainDepend)
+            //    return true;
             return false;
         }
 
@@ -159,7 +161,7 @@ namespace GameWarriors.DependencyInjection.Core
                     IServiceItem serviceItem = _mainTypeTable[mainType];
                     if (!serviceItem.IsCreated())
                     {
-                        serviceItem.CreateInstance(mainType, injectType, this);
+                        serviceItem.CreateInstance(mainType, injectType, _dependencyHistory, this);
                     }
                     else
                     {
@@ -222,7 +224,7 @@ namespace GameWarriors.DependencyInjection.Core
                 }
                 else
                 {
-                    return item.CreateInstance(mainType, serviceType, this);
+                    return item.CreateInstance(mainType, serviceType, _dependencyHistory, this);
                 }
             }
             return null;

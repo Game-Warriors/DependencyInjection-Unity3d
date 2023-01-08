@@ -1,4 +1,5 @@
 using GameWarriors.DependencyInjection.Abstraction;
+using GameWarriors.DependencyInjection.Extensions;
 using System;
 using System.Reflection;
 using System.Runtime.CompilerServices;
@@ -8,10 +9,9 @@ namespace GameWarriors.DependencyInjection.Core
     internal class MiniServiceItem : IServiceItem
     {
         public object Instance { get; set; }
-        public bool IsChainDepend { get; set; }
         public MethodInfo LoadingMethod { get; private set; }
 
-        public object CreateInstance(Type mainType, Type injectType, IServiceCollection serviceCollection)
+        public object CreateInstance(Type mainType, Type injectType, IDependencyHistory history, IServiceCollection serviceCollection)
         {
             ParameterInfo[] constructorParams = mainType.GetConstructorParams();
             object serviceObject;
@@ -24,17 +24,18 @@ namespace GameWarriors.DependencyInjection.Core
                 int length = constructorParams?.Length ?? 0;
                 if (length > 0)
                 {
-                    IsChainDepend = true;
+                    history.AddDependency(mainType);
+                    history.AddDependency(injectType);
                     object[] tmp = new object[length];
                     for (int i = 0; i < length; ++i)
                     {
                         Type argType = constructorParams[i].ParameterType;
-                        if (serviceCollection.IsChainDepend(argType))
-                            throw new Exception($"There are circle dependency reference between type {mainType} & {argType}");
+                        history.CheckDependencyHistory(argType);
                         tmp[i] = serviceCollection.ResolveSingletonService(argType);
                     }
 
-                    IsChainDepend = false;
+                    history.RemoveDependency(mainType);
+                    history.RemoveDependency(injectType);
                     serviceObject = Activator.CreateInstance(mainType, tmp);
                 }
                 else
