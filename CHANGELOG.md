@@ -1,3 +1,6 @@
+  version : 0.8.3
+  Add extra loading in build pipeline
+
   version : 0.8.2
   Add circle dependency detection in constructor to service collection build pipeline
 

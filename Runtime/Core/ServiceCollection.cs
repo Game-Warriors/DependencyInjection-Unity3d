@@ -16,25 +16,26 @@ namespace GameWarriors.DependencyInjection.Core
         private List<ITransientServiceItem> _transientItems;
         private ServiceProvider _serviceProvider;
         private DependencyHistory _dependencyHistory;
+        private Func<Task> _extraLoading;
         private int _loadingCount;
 
-        public ServiceCollection(string initMethodName = default) : this(new ServiceProvider(), initMethodName)
+        public ServiceCollection(string initMethodName = default, Func<Task> extraLoading = default) : this(new ServiceProvider(), initMethodName, extraLoading)
         {
         }
 
-        public ServiceCollection(ServiceProvider serviceProvider, string initMethodName = default)
+        public ServiceCollection(ServiceProvider serviceProvider, string initMethodName = default, Func<Task> extraLoading = default)
         {
             INIT_METHOD_NAME = initMethodName;
             _mainTypeTable = new Dictionary<Type, IServiceItem>();
             _abstractionToMainTable = new Dictionary<Type, Type>();
             _transientItems = new List<ITransientServiceItem>();
+            _extraLoading = extraLoading;
             if (serviceProvider == null)
                 throw new NullReferenceException("Ther service provider is null");
             _serviceProvider = serviceProvider;
             _dependencyHistory = new DependencyHistory();
             AddSingleton<IServiceProvider, ServiceProvider>(_serviceProvider);
         }
-
 
 
         public void AddSingleton<T>() where T : class
@@ -111,6 +112,9 @@ namespace GameWarriors.DependencyInjection.Core
 
                 //stopwatch.Start();
                 await WaitLoadingAll();
+                Task extraLoadingTask = _extraLoading?.Invoke();
+                if (extraLoadingTask != null)
+                    await extraLoadingTask;
                 WaitInitAll();
                 //stopwatch.Stop();
                 //UnityEngine.Debug.Log(stopwatch.ElapsedTicks);
