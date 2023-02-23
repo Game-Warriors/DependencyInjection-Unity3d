@@ -1,5 +1,4 @@
 using GameWarriors.DependencyInjection.Abstraction;
-using GameWarriors.DependencyInjection.Attributes;
 using GameWarriors.DependencyInjection.Extensions;
 using System;
 using System.Collections;
@@ -204,9 +203,8 @@ namespace GameWarriors.DependencyInjection.Core
             int length = properties?.Length ?? 0;
             for (int i = 0; i < length; ++i)
             {
-                InjectAttribute attribute = properties[i].GetCustomAttribute<InjectAttribute>();
                 Type abstractionType = properties[i].PropertyType;
-                if (attribute != null && properties[i].CanWrite && _abstractionToMainTable.TryGetValue(abstractionType, out var mainType) && _mainTypeTable.TryGetValue(mainType, out var item))
+                if (properties[i].CanWrite && _abstractionToMainTable.TryGetValue(abstractionType, out var mainType) && _mainTypeTable.TryGetValue(mainType, out var item))
                 {
                     properties[i].SetValue(targetItem.Instance, item.Instance);
                 }

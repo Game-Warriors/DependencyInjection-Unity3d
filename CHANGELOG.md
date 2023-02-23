@@ -1,3 +1,6 @@
+  version : 0.8.4
+  Remove inject attribute and check exception handling
+
   version : 0.8.3
   Add extra loading in build pipeline
 

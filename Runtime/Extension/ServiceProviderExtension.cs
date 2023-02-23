@@ -1,4 +1,3 @@
-using GameWarriors.DependencyInjection.Attributes;
 using System;
 using System.Reflection;
 using System.Runtime.CompilerServices;
@@ -22,9 +21,8 @@ namespace GameWarriors.DependencyInjection.Extensions
             int length = properties?.Length ?? 0;
             for (int i = 0; i < length; ++i)
             {
-                InjectAttribute attribute = properties[i].GetCustomAttribute<InjectAttribute>();
                 Type abstractionType = properties[i].PropertyType;
-                if (attribute != null && properties[i].CanWrite)
+                if (properties[i].CanWrite)
                 {
                     object service = serviceProvider.GetService(abstractionType);
                     if (service != null)
@@ -32,7 +30,6 @@ namespace GameWarriors.DependencyInjection.Extensions
                 }
             }
         }
-
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static void InvokeInitMethod(this IServiceProvider serviceProvider, object instance, MethodInfo initMethod, ParameterInfo[] infos)
