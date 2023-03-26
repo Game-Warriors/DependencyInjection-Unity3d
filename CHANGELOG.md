@@ -1,3 +1,6 @@
+  version : 0.8.5
+  Implement new lazy loading pipeline
+
   version : 0.8.4
   Remove inject attribute and check exception handling
 

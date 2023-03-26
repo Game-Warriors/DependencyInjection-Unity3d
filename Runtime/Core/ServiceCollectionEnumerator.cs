@@ -9,7 +9,6 @@ namespace GameWarriors.DependencyInjection.Core
 {
     public class ServiceCollectionEnumerator : IServiceCollection
     {
-        private const string WAIT_FOR_LOADING_METHOD_NAME = "WaitForLoadingCoroutine";
         private readonly string INIT_METHOD_NAME;
         private Dictionary<Type, IServiceItem> _mainTypeTable;
         private Dictionary<Type, Type> _abstractionToMainTable;
@@ -17,6 +16,8 @@ namespace GameWarriors.DependencyInjection.Core
         private ServiceProvider _serviceProvider;
         private DependencyHistory _dependencyHistory;
         private int _loadingCount;
+
+        public string InitializeMethodName => INIT_METHOD_NAME;
 
         public ServiceCollectionEnumerator(string initMethodName = default)
         {
@@ -29,33 +30,33 @@ namespace GameWarriors.DependencyInjection.Core
             _dependencyHistory = new DependencyHistory();
         }
 
-        public void AddSingleton<T>() where T : class
+        public void AddSingleton<T>(Func<T, IEnumerator> loading = null) where T : class
         {
             Type mainType = typeof(T);
-            AddItem(mainType, new MiniServiceItem());
+            AddItem(mainType, new MiniServiceItem<T>(loading));
             _abstractionToMainTable.Add(mainType, mainType);
         }
 
-        public void AddSingleton<T>(T instance) where T : class
+        public void AddSingleton<T>(T instance, Func<T, IEnumerator> loading = null) where T : class
         {
             Type mainType = typeof(T);
-            AddItem(mainType, new MiniServiceItem() { Instance = instance });
+            AddItem(mainType, new MiniServiceItem<T>(loading) { Instance = instance });
             _abstractionToMainTable.Add(mainType, mainType);
         }
 
-        public void AddSingleton<I, T>() where T : class, I
+        public void AddSingleton<I, T>(Func<T, IEnumerator> loading = null) where T : class, I
         {
             Type mainType = typeof(T);
-            var item = new MiniServiceItem();
+            var item = new MiniServiceItem<T>(loading);
             AddItem(mainType, item);
             _abstractionToMainTable.Add(typeof(I), mainType);
         }
 
-        public void AddSingleton<I, T>(T instance) where T : class, I
+        public void AddSingleton<I, T>(T instance, Func<T, IEnumerator> loading = null) where T : class, I
         {
             Type mainType = typeof(T);
             Type injectType = typeof(I);
-            AddItem(mainType, new MiniServiceItem() { Instance = instance });
+            AddItem(mainType, new MiniServiceItem<T>(loading) { Instance = instance });
             _abstractionToMainTable.Add(injectType, mainType);
         }
 
@@ -127,10 +128,11 @@ namespace GameWarriors.DependencyInjection.Core
             IEnumerator[] loadingList = new IEnumerator[_loadingCount];
             foreach (var item in _mainTypeTable.Values)
             {
-                if (item.LoadingMethod != null)
+                IEnumerator enumerator = item.InvokeLoading();
+                if (enumerator != null)
                 {
                     --_loadingCount;
-                    loadingList[_loadingCount] = InvokeLoading(item.LoadingMethod, item.Instance);
+                    loadingList[_loadingCount] = enumerator;
                 }
             }
             int length = loadingList.Length;
@@ -152,12 +154,7 @@ namespace GameWarriors.DependencyInjection.Core
 
             foreach (var item in _mainTypeTable)
             {
-                MethodInfo initMethod = item.Key.FindMethod(INIT_METHOD_NAME);
-                if (initMethod != null)
-                {
-                    ParameterInfo[] parameterInfos = initMethod.GetParameters();
-                    this.InvokeInit(initMethod, parameterInfos, item.Value.Instance);
-                }
+                item.Value.InvokeInitialization(item.Key, this);
             }
         }
 
@@ -179,7 +176,7 @@ namespace GameWarriors.DependencyInjection.Core
             }
         }
 
-        private void AddItem(Type injectType, MiniServiceItem item)
+        private void AddItem(Type injectType, IServiceItem item)
         {
             if (!_mainTypeTable.ContainsKey(injectType))
                 _mainTypeTable.Add(injectType, item);
@@ -190,8 +187,8 @@ namespace GameWarriors.DependencyInjection.Core
             Type mainType = input.Key;
             IServiceItem item = input.Value;
 
-            item.SetupParams(mainType, INIT_METHOD_NAME, WAIT_FOR_LOADING_METHOD_NAME);
-            if (item.LoadingMethod != null)
+            bool hasLaoding = item.SetupParams(mainType, INIT_METHOD_NAME);
+            if (hasLaoding)
             {
                 ++_loadingCount;
             }

@@ -1,29 +1,34 @@
 ﻿using GameWarriors.DependencyInjection.Abstraction;
 using GameWarriors.DependencyInjection.Extensions;
 using System;
+using System.Collections;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Threading.Tasks;
 
 namespace GameWarriors.DependencyInjection.Core
 {
-
-    internal class ServiceItem : IServiceItem
+    internal class ServiceItem<T> : IServiceItem
     {
         public object Instance { get; set; }
         public ParameterInfo[] CtorParamsArray { get; internal set; }
-        public MethodInfo LoadingMethod { get; internal set; }
+        public Func<T, Task> LoadingMethod { get; internal set; }
         public MethodInfo InitMethod { get; internal set; }
         public ParameterInfo[] InitParamsArray { get; internal set; }
         private PropertyInfo[] Properties { get; set; }
 
+        public ServiceItem(Func<T, Task> loadingMethod)
+        {
+            LoadingMethod = loadingMethod;
+        }
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void SetupParams(Type mainType, string initMethodName, string loadingMethodName)
+        public bool SetupParams(Type mainType, string initMethodName)
         {
             if (!mainType.IsUnityMonoBehaviour())
             {
                 CtorParamsArray = mainType.GetConstructorParams();
             }
-            LoadingMethod = mainType.FindMethod(loadingMethodName);
             Properties = mainType.FindProperties();
             if (!string.IsNullOrEmpty(initMethodName))
             {
@@ -33,6 +38,7 @@ namespace GameWarriors.DependencyInjection.Core
                     InitParamsArray = InitMethod.GetParameters();
                 }
             }
+            return LoadingMethod != null;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -76,6 +82,22 @@ namespace GameWarriors.DependencyInjection.Core
         public void SetProperties(IServiceProvider serviceProvider)
         {
             serviceProvider.SetProperties(Instance, Properties);
+        }
+
+        public void InvokeInitialization(Type baseType, IServiceCollection serviceCollection)
+        {
+            if (InitMethod != null)
+                serviceCollection.InvokeInit(InitMethod, InitParamsArray, Instance);
+        }
+
+        public Task InvokeLoadingAsync()
+        {
+            return LoadingMethod?.Invoke((T)Instance);
+        }
+
+        public IEnumerator InvokeLoading()
+        {
+            return null;
         }
     }
 }

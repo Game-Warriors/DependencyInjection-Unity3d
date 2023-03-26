@@ -1,15 +1,22 @@
 using GameWarriors.DependencyInjection.Abstraction;
 using GameWarriors.DependencyInjection.Extensions;
 using System;
+using System.Collections;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Threading.Tasks;
 
 namespace GameWarriors.DependencyInjection.Core
 {
-    internal class MiniServiceItem : IServiceItem
+    internal class MiniServiceItem<T> : IServiceItem
     {
         public object Instance { get; set; }
-        public MethodInfo LoadingMethod { get; private set; }
+        public Func<T, IEnumerator> LoadingMethod { get; internal set; }
+
+        public MiniServiceItem(Func<T, IEnumerator> loading)
+        {
+            LoadingMethod = loading;
+        }
 
         public object CreateInstance(Type mainType, Type injectType, IDependencyHistory history, IServiceCollection serviceCollection)
         {
@@ -48,6 +55,27 @@ namespace GameWarriors.DependencyInjection.Core
             return serviceObject;
         }
 
+
+        public void InvokeInitialization(Type baseType, IServiceCollection serviceCollection)
+        {
+            MethodInfo initMethod = baseType.FindMethod(serviceCollection.InitializeMethodName);
+            if (initMethod != null)
+            {
+                ParameterInfo[] parameterInfos = initMethod.GetParameters();
+                serviceCollection.InvokeInit(initMethod, parameterInfos, Instance);
+            }
+        }
+
+        public IEnumerator InvokeLoading()
+        {
+            return LoadingMethod?.Invoke((T)Instance);
+        }
+
+        public Task InvokeLoadingAsync()
+        {
+            return null;
+        }
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void SetProperties(IServiceProvider serviceProvider)
         {
@@ -55,9 +83,9 @@ namespace GameWarriors.DependencyInjection.Core
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void SetupParams(Type mainType, string initMethodName, string loadingMethodName)
+        public bool SetupParams(Type mainType, string initMethodName)
         {
-            LoadingMethod = mainType.FindMethod(loadingMethodName);
+            return LoadingMethod != null;
         }
     }
 }
