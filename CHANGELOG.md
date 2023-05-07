@@ -1,3 +1,6 @@
+  version : 0.8.6
+  Update readme and add none generic method to service collections
+
   version : 0.8.5
   Implement new lazy loading pipeline
 

@@ -36,6 +36,9 @@ namespace GameWarriors.DependencyInjection.Core
 
         public object GetService(Type serviceType)
         {
+            if (serviceType == null)
+                return null;
+
             object service = _singletonLocator.Resolve(serviceType);
             if (service == null)
             {

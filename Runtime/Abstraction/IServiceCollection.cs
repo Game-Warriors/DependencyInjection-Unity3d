@@ -1,4 +1,3 @@
-
 using System;
 
 namespace GameWarriors.DependencyInjection.Abstraction
@@ -7,7 +6,6 @@ namespace GameWarriors.DependencyInjection.Abstraction
     {
         string InitializeMethodName { get; }
 
-        bool IsChainDepend(Type argType);
         object ResolveSingletonService(Type argType);
         void SetSingletonService(Type injectType, object serviceObject);
     }

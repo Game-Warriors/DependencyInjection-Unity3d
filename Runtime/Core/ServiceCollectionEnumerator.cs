@@ -15,19 +15,43 @@ namespace GameWarriors.DependencyInjection.Core
         private List<ITransientServiceItem> _transientItems;
         private ServiceProvider _serviceProvider;
         private DependencyHistory _dependencyHistory;
-        private int _loadingCount;
 
         public string InitializeMethodName => INIT_METHOD_NAME;
 
-        public ServiceCollectionEnumerator(string initMethodName = default)
+        public ServiceCollectionEnumerator(ServiceProvider serviceProvider, string initMethodName = default)
         {
             INIT_METHOD_NAME = initMethodName;
             _mainTypeTable = new Dictionary<Type, IServiceItem>();
             _abstractionToMainTable = new Dictionary<Type, Type>();
             _transientItems = new List<ITransientServiceItem>();
-            _serviceProvider = new ServiceProvider();
+            _serviceProvider = serviceProvider;
             AddSingleton<IServiceProvider, ServiceProvider>(_serviceProvider);
             _dependencyHistory = new DependencyHistory();
+        }
+
+        public ServiceCollectionEnumerator(string initMethodName = default) : this(new ServiceProvider(), initMethodName)
+        {
+        }
+
+        public void AddSingleton(object instance)
+        {
+            Type mainType = instance.GetType();
+            AddSingleton(instance, mainType, mainType);
+        }
+
+        public void AddSingleton(Type mainType, Type injectType)
+        {
+            ServiceItem<object> serviceItem = new ServiceItem<object>(null);
+            AddItem(mainType, serviceItem);
+            _abstractionToMainTable.Add(injectType, mainType);
+        }
+
+        public void AddSingleton(object instance, Type mainType, Type injectType)
+        {
+            ServiceItem<object> serviceItem = new ServiceItem<object>(null);
+            serviceItem.Instance = instance;
+            AddItem(mainType, serviceItem);
+            _abstractionToMainTable.Add(injectType, mainType);
         }
 
         public void AddSingleton<T>(Func<T, IEnumerator> loading = null) where T : class
@@ -76,27 +100,23 @@ namespace GameWarriors.DependencyInjection.Core
         //    _serviceProvider.SetTransientService(typeof(I), serviceFactory);
         //}
 
-        bool IServiceCollection.IsChainDepend(Type argType)
-        {
-            //if (_mainTypeTable.TryGetValue(argType, out var serviceItem) && serviceItem.IsChainDepend)
-            //    return true;
-            return false;
-        }
-
         void IServiceCollection.SetSingletonService(Type injectType, object serviceObject)
         {
             _serviceProvider.SetSingletonService(injectType, serviceObject);
         }
+
         public IEnumerator Build(Action<IServiceProvider> onDone = null)
         {
             //System.Diagnostics.Stopwatch stopwatch = new System.Diagnostics.Stopwatch();
             //stopwatch.Start();
-            _loadingCount = 0;
-
+            int loadingCount = 0;
             int counter = 0;
             foreach (var item in _mainTypeTable)
             {
-                FindLoadingMethod(item);
+                bool hasLaoding = CheckLoadingMethod(item);
+                if (hasLaoding)
+                    ++loadingCount;
+
                 ++counter;
                 if (counter > 50)
                 {
@@ -125,14 +145,14 @@ namespace GameWarriors.DependencyInjection.Core
                     yield return null;
                 }
             }
-            IEnumerator[] loadingList = new IEnumerator[_loadingCount];
+            IEnumerator[] loadingList = new IEnumerator[loadingCount];
             foreach (var item in _mainTypeTable.Values)
             {
                 IEnumerator enumerator = item.InvokeLoading();
                 if (enumerator != null)
                 {
-                    --_loadingCount;
-                    loadingList[_loadingCount] = enumerator;
+                    --loadingCount;
+                    loadingList[loadingCount] = enumerator;
                 }
             }
             int length = loadingList.Length;
@@ -182,16 +202,12 @@ namespace GameWarriors.DependencyInjection.Core
                 _mainTypeTable.Add(injectType, item);
         }
 
-        private void FindLoadingMethod(KeyValuePair<Type, IServiceItem> input)
+        private bool CheckLoadingMethod(KeyValuePair<Type, IServiceItem> input)
         {
             Type mainType = input.Key;
             IServiceItem item = input.Value;
-
             bool hasLaoding = item.SetupParams(mainType, INIT_METHOD_NAME);
-            if (hasLaoding)
-            {
-                ++_loadingCount;
-            }
+            return hasLaoding;
         }
 
         private void SetSingletonProperties(Type targetType, IServiceItem targetItem)
@@ -208,21 +224,12 @@ namespace GameWarriors.DependencyInjection.Core
             }
         }
 
-        private IEnumerator InvokeLoading(MethodInfo methodInfo, object instance)
-        {
-            IEnumerator tmp = methodInfo.Invoke(instance, null) as IEnumerator;
-            if (tmp == null)
-                UnityEngine.Debug.LogError(instance);
-            return tmp;
-        }
-
         public object ResolveSingletonService(Type serviceType)
         {
             if (_abstractionToMainTable.TryGetValue(serviceType, out var mainType) && _mainTypeTable.TryGetValue(mainType, out var item))
             {
                 if (item.Instance != null)
                 {
-                    //Debug.Log(item.Instance);
                     return item.Instance;
                 }
                 else
@@ -232,6 +239,5 @@ namespace GameWarriors.DependencyInjection.Core
             }
             return null;
         }
-
     }
 }

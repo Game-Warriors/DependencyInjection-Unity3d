@@ -1,7 +1,6 @@
 using System;
 using System.Reflection;
 using System.Runtime.CompilerServices;
-using UnityEngine;
 
 namespace GameWarriors.DependencyInjection.Extensions
 {
@@ -19,15 +18,24 @@ namespace GameWarriors.DependencyInjection.Extensions
             return mainType.GetProperties(BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.SetProperty);
         }
 
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool IsUnityMonoBehaviour(this Type mainType)
         {
-            return mainType.IsSubclassOf(typeof(MonoBehaviour));
+#if UNITY_2018_4_OR_NEWER
+            return mainType.IsSubclassOf(typeof(UnityEngine.MonoBehaviour));
+#else
+            return false;
+#endif
         }
 
         public static object CreateUnityGameObject(this Type mainType)
         {
-            return new GameObject(mainType.Name, mainType).GetComponent(mainType);
+#if UNITY_2018_4_OR_NEWER
+            return new UnityEngine.GameObject(mainType.Name, mainType).GetComponent(mainType);
+#else
+            return null;
+#endif
         }
 
 
