@@ -1,3 +1,6 @@
+  version : 0.8.7
+  Fix compatibility to old unity dotnet
+
   version : 0.8.6
   Update readme and add none generic method to service collections
 

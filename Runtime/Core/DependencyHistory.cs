@@ -11,7 +11,7 @@ namespace GameWarriors.DependencyInjection.Core
 
         public DependencyHistory()
         {
-            _dependencyTable = new();
+            _dependencyTable = new Dictionary<Type, int>();
         }
 
         public void AddDependency(Type injectType)
@@ -20,7 +20,15 @@ namespace GameWarriors.DependencyInjection.Core
             {
                 _firstType = injectType;
             }
+
+#if UNITY_2018_4_OR_NEWER && !UNITY_2021_1_OR_NEWER
+            if (!_dependencyTable.ContainsKey(injectType))
+            {
+                _dependencyTable.Add(injectType, 0);
+            }
+#else
             _dependencyTable.TryAdd(injectType, 0);
+#endif
         }
 
         public void RemoveDependency(Type injectType)
