@@ -5,7 +5,7 @@ using System.Runtime.CompilerServices;
 
 namespace GameWarriors.DependencyInjection.Extensions
 {
-    internal static class ServiceCollectionExtenstion
+    internal static class ServiceCollectionExtension
     {
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -30,7 +30,7 @@ namespace GameWarriors.DependencyInjection.Extensions
                 for (int i = 0; i < length; ++i)
                 {
                     Type argType = infos[i].ParameterType;
-                    tmp[i] = serviceCollection.ResolveSingletonService(argType);
+                    tmp[i] = serviceCollection.ResolveService(argType);
                 }
                 methodInfo.Invoke(instance, tmp);
             }
@@ -41,5 +41,22 @@ namespace GameWarriors.DependencyInjection.Extensions
         //{
         //    Debug.LogError($"Error in Class:{item}, by message: " +  message);
         //}
+
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static void SetProperties(this IServiceCollection serviceCollection, object instance, PropertyInfo[] properties)
+        {
+            int length = properties?.Length ?? 0;
+            for (int i = 0; i < length; ++i)
+            {
+                Type abstractionType = properties[i].PropertyType;
+                if (properties[i].CanWrite)
+                {
+                    object service = serviceCollection.ResolveService(abstractionType);
+                    if (service != null)
+                        properties[i].SetValue(instance, service);
+                }
+            }
+        }
     }
 }

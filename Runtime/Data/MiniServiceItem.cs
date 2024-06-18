@@ -21,6 +21,7 @@ namespace GameWarriors.DependencyInjection.Core
         public object CreateInstance(Type mainType, Type injectType, IDependencyHistory history, IServiceCollection serviceCollection)
         {
             ParameterInfo[] constructorParams = mainType.GetConstructorParams();
+            //PropertyInfo[] properties = mainType.FindProperties();
             object serviceObject;
             if (constructorParams == null && mainType.IsUnityMonoBehaviour())
             {
@@ -38,7 +39,7 @@ namespace GameWarriors.DependencyInjection.Core
                     {
                         Type argType = constructorParams[i].ParameterType;
                         history.CheckDependencyHistory(argType);
-                        tmp[i] = serviceCollection.ResolveSingletonService(argType);
+                        tmp[i] = serviceCollection.ResolveService(argType);
                     }
 
                     history.RemoveDependency(mainType);

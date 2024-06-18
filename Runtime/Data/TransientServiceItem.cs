@@ -84,8 +84,6 @@ namespace GameWarriors.DependencyInjection.Core
                 this.LogError("Exception in CreateInstance method, " + E.Message);
                 return null;
             }
-
         }
-
     }
 }

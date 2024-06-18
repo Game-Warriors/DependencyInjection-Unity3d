@@ -53,7 +53,7 @@ namespace GameWarriors.DependencyInjection.Extensions
                 }
                 else
                 {
-                    ServiceCollectionExtenstion.LogError(mainType, $"error in GetConstructorParams");
+                    ServiceCollectionExtension.LogError(mainType, $"error in GetConstructorParams");
                     return null;
                 }
             }

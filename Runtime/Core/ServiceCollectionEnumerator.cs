@@ -113,8 +113,8 @@ namespace GameWarriors.DependencyInjection.Core
             int counter = 0;
             foreach (var item in _mainTypeTable)
             {
-                bool hasLaoding = CheckLoadingMethod(item);
-                if (hasLaoding)
+                bool hasLoading = CheckLoadingMethod(item);
+                if (hasLoading)
                     ++loadingCount;
 
                 ++counter;
@@ -126,12 +126,12 @@ namespace GameWarriors.DependencyInjection.Core
             }
 
             yield return null;
-            InitializeSingleton();
-
             foreach (var item in _transientItems)
             {
                 item.SetupParams(INIT_METHOD_NAME);
             }
+
+            InitializeSingleton();
 
             yield return null;
             counter = 0;
@@ -206,8 +206,8 @@ namespace GameWarriors.DependencyInjection.Core
         {
             Type mainType = input.Key;
             IServiceItem item = input.Value;
-            bool hasLaoding = item.SetupParams(mainType, INIT_METHOD_NAME);
-            return hasLaoding;
+            bool hasLoading = item.SetupParams(mainType, INIT_METHOD_NAME);
+            return hasLoading;
         }
 
         private void SetSingletonProperties(Type targetType, IServiceItem targetItem)
@@ -217,9 +217,17 @@ namespace GameWarriors.DependencyInjection.Core
             for (int i = 0; i < length; ++i)
             {
                 Type abstractionType = properties[i].PropertyType;
-                if (properties[i].CanWrite && _abstractionToMainTable.TryGetValue(abstractionType, out var mainType) && _mainTypeTable.TryGetValue(mainType, out var item))
+                if (!properties[i].CanWrite)
+                    continue;
+                if (_abstractionToMainTable.TryGetValue(abstractionType, out var mainType) && _mainTypeTable.TryGetValue(mainType, out var item))
                 {
                     properties[i].SetValue(targetItem.Instance, item.Instance);
+                }
+                else
+                {
+                    object transientItem = _serviceProvider.GetTransientService(abstractionType);
+                    if (transientItem != null)
+                        properties[i].SetValue(targetItem.Instance, transientItem);
                 }
             }
         }
@@ -238,6 +246,12 @@ namespace GameWarriors.DependencyInjection.Core
                 }
             }
             return null;
+        }
+
+        object IServiceCollection.ResolveService(Type serviceType)
+        {
+            object item = ResolveSingletonService(serviceType) ?? _serviceProvider.GetTransientService(serviceType);
+            return item;
         }
     }
 }

@@ -6,7 +6,8 @@ namespace GameWarriors.DependencyInjection.Abstraction
     {
         string InitializeMethodName { get; }
 
-        object ResolveSingletonService(Type argType);
+        object ResolveSingletonService(Type serviceType);
+        object ResolveService(Type serviceType);
         void SetSingletonService(Type injectType, object serviceObject);
     }
 }

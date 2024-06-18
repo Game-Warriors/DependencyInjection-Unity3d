@@ -62,7 +62,7 @@ namespace GameWarriors.DependencyInjection.Core
                     {
                         Type argType = constructorParams[i].ParameterType;
                         history.CheckDependencyHistory(argType);
-                        tmp[i] = serviceCollection.ResolveSingletonService(argType);
+                        tmp[i] = serviceCollection.ResolveService(argType);
                     }
                     history.RemoveDependency(mainType);
                     history.RemoveDependency(injectType);

@@ -42,10 +42,20 @@ namespace GameWarriors.DependencyInjection.Core
             object service = _singletonLocator.Resolve(serviceType);
             if (service == null)
             {
-                if (_transienTable.TryGetValue(serviceType, out var item))
+                if (_transienTable.TryGetValue(serviceType, out IObjectFactory item))
                 {
                     service = item.CreateObject(this);
                 }
+            }
+            return service;
+        }
+
+        public object GetTransientService(Type serviceType)
+        {
+            object service = null;
+            if (_transienTable.TryGetValue(serviceType, out IObjectFactory item))
+            {
+                service = item.CreateObject(this);
             }
             return service;
         }

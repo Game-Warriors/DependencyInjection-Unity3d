@@ -146,6 +146,12 @@ namespace GameWarriors.DependencyInjection.Core
             return null;
         }
 
+        object IServiceCollection.ResolveService(Type serviceType)
+        {
+            object item = ResolveSingletonService(serviceType) ?? _serviceProvider.GetTransientService(serviceType);
+            return item;
+        }
+
         private Task WaitLoadingAll()
         {
             Task[] loadingTasks = new Task[_loadingCount];

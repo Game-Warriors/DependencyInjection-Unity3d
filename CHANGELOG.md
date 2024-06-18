@@ -1,3 +1,6 @@
+  version : 0.8.8
+  feature : implementing transient object resolving in singleton objects constructor, properties and initialization method.
+
   version : 0.8.7
   Fix compatibility to old unity dotnet
 
